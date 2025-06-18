@@ -1,7 +1,7 @@
 from ucimlrepo import fetch_ucirepo
+import pandas as pd
 
-
-def fetch_dataset() -> 'pandas.DataFrame':
+def fetch_dataset() -> pd.DataFrame:
     """
     fetch adult dataset from UCI Machine Learning Repository (https://archive.ics.uci.edu/dataset/2/adult)
     RETURN: adult dataset as a pandas dataframe
@@ -83,3 +83,19 @@ def read_hierarchy(file_path: str) -> dict:
             prev_level, prev_value = level, value
 
     return hierarchy
+
+def read_hierarchy_df(file_path: str) -> pd.DataFrame:
+    """
+    read_hierarchy()の戻り値をdatafremeにするwrapper
+    param file_path: path to the hierarchy file
+    return: hierarchy as a pandas DataFrame
+    
+    return DataFrame:
+    child, parent
+    ...  , ...
+    ...  , ...
+    ...
+
+    """
+    hierarchy = read_hierarchy(file_path)
+    return pd.DataFrame(list(hierarchy.items()), columns=['child', 'parent'])
