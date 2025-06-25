@@ -104,7 +104,7 @@ def read_hierarchy(file_path: str, col_name: str) -> pd.DataFrame:
     hierarchy_df = _format_df(hierarchy_df)
 
     # add target column name
-    hierarchy_df['col_name'] = col_name
+    hierarchy_df['column'] = col_name
 
     return hierarchy_df
 
