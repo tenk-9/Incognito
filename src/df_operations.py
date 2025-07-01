@@ -1,4 +1,5 @@
 import pandas as pd
+from typing import List
 
 NAN_REPLACE_DICT = {
     'workclass': 'DROP',
@@ -49,3 +50,21 @@ def replace_nan(df: pd.DataFrame, replace_dict: dict = NAN_REPLACE_DICT) -> pd.D
     replaced_df.fillna(replace_dict, inplace=True)
     
     return df
+
+def is_k_anonymous(df: pd.DataFrame, target_cols: List[str], k: int) -> bool:
+    """
+    dfがtarget_colsにおいてk-匿名であるか確認する
+    
+    df: Input DataFrame
+    target_cols: List of columns to check for k-anonymity.
+    k: The value of k for k-anonymity.
+    return: True if the DataFrame is k-anonymous, False otherwise.
+    """
+    
+    # 各target_colsの組み合わせでグループ化し、サイズをカウント
+    grouped = df.groupby(target_cols ,dropna=False)
+    print(grouped.size())
+    # 各グループのサイズがk以上であるか確認
+    is_k_anonymous = all(size >= k for size in grouped.size())
+    
+    return is_k_anonymous
