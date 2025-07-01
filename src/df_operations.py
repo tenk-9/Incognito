@@ -28,10 +28,14 @@ def generalize(df: pd.DataFrame, hierarchy_df: pd.DataFrame) -> pd.DataFrame:
         # 一般化規約の抽出
         mapping = hierarchy_df[hierarchy_df['column'] == generalize_col][['child', 'parent']]
         # 各列について一般化規則を反映
-        merged = generalized_df[[generalize_col]].merge(mapping, how='left', left_on=generalize_col, right_on='child')
-        generalized_df[generalize_col] = merged['parent']
+        merged = generalized_df[[generalize_col]].merge(
+            mapping,
+            left_on=generalize_col,
+            right_on='child',
+            how='left'
+        )
+        generalized_df[generalize_col] = merged['parent'].where(merged['parent'].notna(), merged[generalize_col])
 
-    print(generalized_df)
     return generalized_df
 
 def replace_nan(df: pd.DataFrame, replace_dict: dict = NAN_REPLACE_DICT) -> pd.DataFrame:
