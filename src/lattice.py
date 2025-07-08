@@ -1,6 +1,8 @@
 import pandas as pd
 import queue
 
+from typing import Union
+
 class Lattice():
     """
     Latticeを表現するクラス
@@ -111,7 +113,7 @@ class Lattice():
         bfs_queue = queue.Queue()
         found_node_ids = set()
 
-        # attribute: levelのdictを見ながらbfsする
+        # {attribute: level}のdictを見ながらbfsする
         root = {key: 0 for key in attribute_maxlevel.keys()}
 
         ## 初期化: 一般化レベルが最も低いnodeを追加
@@ -144,24 +146,70 @@ class Lattice():
                         bfs_queue.put(new_node)
                         found_node_ids.add(new_node['idx'])
         
-        print(self.nodes)
-        print(self.edges)
+        # print(self.nodes)
+        # print(self.edges)
 
-    def drop_node(self, id: int) -> None:
+    def drop_node(self, id: Union[int, float]) -> None:
         """
         idのノードを削除する
         """
-        # self.nodesから行を削除
-        # 削除した行を self.dropped_nodes に追加
-        # self.edgesから、id番のノードがfromのエッジを削除
-        pass
+        # idのノードを削除
+        self.dropped_nodes = pd.concat([self.dropped_nodes, self.nodes[self.nodes['idx'] == id]])
+        self.nodes = self.nodes[self.nodes['idx'] != id]
+        
+        # idのノードに関連するエッジを削除
+        self.dropped_edges = pd.concat(
+            [
+                self.dropped_edges,
+                self.edges[
+                    (self.edges['from'] == id) |
+                    (self.edges['to'] == id)
+                ]
+            ]
+        )
+        self.edges = self.edges[
+            (self.edges['from'] != id) &
+            (self.edges['to'] != id)
+        ]
 
     def reconstruct(self, ref_lattice: "Lattice") -> None:
         """
         ref_latticeを参照して、latticeを再構築する
         self.nodesから、ref_lattice.drop_nodesの条件を含むノードを削除し、エッジを再構築
         """
-        # self.nodesと、ref_lattice.dropped_nodesを内部結合
-        # 浮き出たノードをself.dropped_nodesに追加
-        # 浮き出たノードに関連するエッジを削除
-        pass
+        # self.nodesのうち、ref_lattice.dropped_nodesに含まれる条件を満たす（削除されるべき）ノードを抽出
+        dropping_nodes = pd.merge(
+            self.nodes,
+            ref_lattice.dropped_nodes,
+            how='inner',
+            on=ref_lattice.dropped_nodes.columns.tolist()[1:],  # idxを除く
+        )
+
+        for id in dropping_nodes['idx_x']:
+            # ノードを削除
+            self.drop_node(id)
+        
+        # # drop対象のノードを削除
+        # self.dropped_nodes = pd.concat(
+        #     [
+        #         self.dropped_nodes,
+        #         self.nodes[self.nodes['idx'].isin(dropping_nodes['idx_x'])]
+        #     ],
+        #     ignore_index=True
+        # )
+        # self.nodes = self.nodes[~self.nodes['idx'].isin(dropping_nodes['idx_x'])]
+
+        # # self.edgesのうち、ref_lattice.dropped_edgesに含まれる条件を満たす（削除されるべき）エッジを抽出
+        # dropping_edges = pd.merge(
+        #     self.edges,
+        #     ref_lattice.dropped_edges,
+        #     how='inner',
+        #     on=ref_lattice.dropped_edges.columns.tolist()[1:],  # idxを除く
+        # )
+        
+    
+    def __str__(self) -> str:
+        """
+        Latticeの文字列表現
+        """
+        return f"Lattice(nodes={self.nodes}, edges={self.edges}, dropped_nodes={self.dropped_nodes}, dropped_edges={self.dropped_edges})"
