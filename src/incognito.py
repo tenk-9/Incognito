@@ -31,6 +31,53 @@ class Incognito:
 
         self._print_result()
 
+    def _pruning(
+        self, lattice: Lattice, df: pd.DataFrame, hierarchy: pd.DataFrame, k: int
+    ) -> Lattice:
+        """
+        Latticeの枝刈りを行う
+        param lattice: 枝刈り対象のLattice
+        param df: 処理対象のdf (概念上の空参照)
+        param hierarchy: 一般化階層の定義df
+        param k: k-匿名性のk値 (概念上の空参照)
+        return: 枝刈り済みのLattice
+        """
+        num_attributes = len(hierarchy["column"].unique())
+        # 各ノードについて、k匿名性を確認し、枝刈りを行う
+        for node in lattice.nodes.itertuples():
+            conditions = []
+            for i in range(1, num_attributes + 1):
+                dim = getattr(node, f"dim{i}")
+                level = getattr(node, f"level{i}")
+                conditions.append((dim, level))
+
+            # ノードの一般化変換を取得: level-0 -> level-n
+            def row_match(row):
+                # すべての(dim, level)条件を満たすか
+                return any(
+                    (row["column"] == dim)
+                    and (row["child_level"] == 0)
+                    and (row["parent_level"] == level)
+                    for dim, level in conditions
+                )
+
+            generalize_hierarchy = hierarchy[hierarchy.apply(row_match, axis=1)]
+
+            # 一般化変換
+            generalized_df = df_operations.generalize(df, generalize_hierarchy)
+
+            # k匿名性の確認
+            if df_operations.is_k_anonymous(
+                generalized_df, [str(dim) for dim, _ in conditions], k
+            ):
+                # k匿名な場合は、枝刈りをしない
+                continue
+            else:
+                # Latticeの枝刈り
+                lattice.drop_node(node.idx)
+
+        return lattice
+
     def _incognito(self, df: pd.DataFrame, hierarchy: pd.DataFrame, k: int) -> Lattice:
         """
         Incognitoのメイン処理
@@ -45,28 +92,8 @@ class Incognito:
             lattice = Lattice(hierarchy)
 
             # 変換Latticeの各ノードについて、k匿名性を確認し、枝刈りを行う
-            for node in lattice.nodes.itertuples():
-                # ノードの一般化変換を取得: level-0 -> level-n
-                generalize_hierarchy = hierarchy[
-                    (hierarchy["column"] == node.dim1)
-                    & (hierarchy["child_level"] == 0)
-                    & (hierarchy["parent_level"] == node.level1)
-                ]
+            lattice = self._pruning(lattice, df, hierarchy, k)
 
-                # 一般化変換
-                generalized_df = df_operations.generalize(self.df, generalize_hierarchy)
-
-                # k匿名性の確認
-                if df_operations.is_k_anonymous(
-                    generalized_df, [str(node.dim1)], self.k
-                ):
-                    # k匿名な場合は、枝刈りをしない
-                    break
-                else:
-                    # Latticeの枝刈り
-                    lattice.drop_node(node.idx)
-
-            # 枝刈り済みのLatticeを返す
             return lattice
 
         # 対象の属性が複数ある場合は、分割して再探索
@@ -77,10 +104,10 @@ class Incognito:
 
             # 枝刈り済みのLatticeを取得
             prunded_lattice1 = self._incognito(
-                self.df, hierarchy[hierarchy["column"].isin(attribute1)], self.k
+                df, hierarchy[hierarchy["column"].isin(attribute1)], k
             )
             prunded_lattice2 = self._incognito(
-                self.df, hierarchy[hierarchy["column"].isin(attribute2)], self.k
+                df, hierarchy[hierarchy["column"].isin(attribute2)], k
             )
 
             # 一旦複数属性のLatticeを作成
@@ -91,7 +118,13 @@ class Incognito:
             lattice.reconstruct(prunded_lattice1)
             lattice.reconstruct(prunded_lattice2)
 
-            # 枝刈り済みのLatticeを返す
+            # 再度枝刈り
+            ## たとえば下のような例があるので、Workclassについてk-10匿名を満たしても、二つの属性を組み合わせると満たさなくなる
+            ## ある属性がk匿名を満たさないなら、その上位集合はk匿名を満たさない　が、ある属性が満たすとき、上位集合も満たすとは限らない
+            # Never-worked      Female        3
+            #                   Male          7
+            lattice = self._pruning(lattice, df, hierarchy, k)
+
             return lattice
 
     def _print_result(self) -> None:
@@ -102,4 +135,4 @@ class Incognito:
         print(
             f"There are {len(self.result_lattice.nodes)} combinations of generalization levels satisfying k-anonymity (k={self.k}):"
         )
-        print(self.result_lattice.nodes)
+        print(self.result_lattice)
