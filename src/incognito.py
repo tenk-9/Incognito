@@ -28,7 +28,9 @@ class Incognito():
         self.k = k
 
 
-        self._incognito(self.df, self.hierarchies, self.k)
+        self.result_lattice = self._incognito(self.df, self.hierarchies, self.k)
+
+        self._print_result()
 
     def _incognito(self, df: pd.DataFrame, hierarchy: pd.DataFrame, k: int) -> Lattice:
         """
@@ -78,15 +80,18 @@ class Incognito():
             # 一旦複数属性のLatticeを作成
             ## TODO: ここでLatticeを生成してから枝刈りするのは遠回りの処理なので、prunded_lattice1とprunded_lattice2を直接マージして複数属性のLatticeを構築したい
             lattice = Lattice(hierarchy)
-            print(lattice)
 
             # 各属性の枝刈り済みLatticeをもとに、複数属性のLatticeを枝刈り
             lattice.reconstruct(prunded_lattice1)
-            print(lattice)
             lattice.reconstruct(prunded_lattice2)
-            print(lattice)
 
             # 枝刈り済みのLatticeを返す
-            print(lattice.nodes)
             return lattice
-            
+    
+    def _print_result(self) -> None:
+        """
+        結果を表示する
+        """
+        print(f"\nIncognito result:")
+        print(f"There are {len(self.result_lattice.nodes)} combinations of generalization levels satisfying k-anonymity (k={self.k}):")
+        print(self.result_lattice.nodes)
