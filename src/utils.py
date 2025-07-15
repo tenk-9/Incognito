@@ -1,5 +1,6 @@
 from ucimlrepo import fetch_ucirepo
 import pandas as pd
+import os
 
 
 def fetch_dataset() -> pd.DataFrame:
@@ -8,9 +9,13 @@ def fetch_dataset() -> pd.DataFrame:
     RETURN: adult dataset as a pandas dataframe
     """
     # Fetch dataset
-    adult = fetch_ucirepo(id=2)
-    data = adult.data.original
-    data.columns = adult.data.headers
+    if os.path.exists(".data/adult.csv"):
+        data = pd.read_csv(".data/adult.csv", index_col=0)
+    else:
+        adult = fetch_ucirepo(id=2)
+        data = adult.data.original
+        data.columns = adult.data.headers
+        data.to_csv(".data/adult.csv")
     return data
 
 
