@@ -191,6 +191,6 @@ class Lattice:
         Latticeの文字列表現
         """
         return (
-            f"\nLattice object at {hex(id(self))}\nnodes:\n{self.nodes},\nedges:\n{self.edges},\ndropped_nodes:\n{self.dropped_nodes},\ndropped_edges:\n{self.dropped_edges}\n"
+            f"\nLattice object at {hex(id(self))}\nnodes:\n{self.nodes},\nedges:\n{self.edges}\n"
             ""
         )
