@@ -34,8 +34,10 @@ class Incognito:
     def _incognito(self, df: pd.DataFrame, hierarchy: pd.DataFrame, k: int) -> Lattice:
         """
         Incognitoのメイン処理
+        param df: 処理対象のdf (概念上の空参照)
         param hierarchy: 一般化階層の定義df
-        return: k-匿名化されたデータフレーム
+        param k: k-匿名性のk値 (概念上の空参照)
+        return: 構成済みのLattice
         """
 
         # 対象の属性が1つなら、一般化してLatticeの枝切りを行う
