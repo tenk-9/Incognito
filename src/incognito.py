@@ -7,7 +7,7 @@ from lattice import Lattice
 # TODO: 探索latticeの表現方法をどうしようか
 
 
-class Incognito():
+class Incognito:
     def __init__(self, df: pd.DataFrame, hierarchies: pd.DataFrame, k: int) -> None:
         """
         Incognitoの初期化
@@ -27,7 +27,6 @@ class Incognito():
         self.hierarchies = hierarchies
         self.k = k
 
-
         self.result_lattice = self._incognito(self.df, self.hierarchies, self.k)
 
         self._print_result()
@@ -39,25 +38,26 @@ class Incognito():
         return: k-匿名化されたデータフレーム
         """
 
-
-        #　対象の属性が1つなら、一般化してLatticeの枝切りを行う
-        if len(hierarchy['column'].unique()) == 1:
+        # 対象の属性が1つなら、一般化してLatticeの枝切りを行う
+        if len(hierarchy["column"].unique()) == 1:
             lattice = Lattice(hierarchy)
 
             # 変換Latticeの各ノードについて、k匿名性を確認し、枝刈りを行う
             for node in lattice.nodes.itertuples():
                 # ノードの一般化変換を取得: level-0 -> level-n
                 generalize_hierarchy = hierarchy[
-                    (hierarchy['column'] == node.dim1) &
-                    (hierarchy['child_level'] == 0) &
-                    (hierarchy['parent_level'] == node.level1)
+                    (hierarchy["column"] == node.dim1)
+                    & (hierarchy["child_level"] == 0)
+                    & (hierarchy["parent_level"] == node.level1)
                 ]
 
                 # 一般化変換
                 generalized_df = df_operations.generalize(self.df, generalize_hierarchy)
 
                 # k匿名性の確認
-                if df_operations.is_k_anonymous(generalized_df, [str(node.dim1)], self.k):
+                if df_operations.is_k_anonymous(
+                    generalized_df, [str(node.dim1)], self.k
+                ):
                     # k匿名な場合は、枝刈りをしない
                     break
                 else:
@@ -66,16 +66,20 @@ class Incognito():
 
             # 枝刈り済みのLatticeを返す
             return lattice
-        
+
         # 対象の属性が複数ある場合は、分割して再探索
         else:
-            attr_count = len(hierarchy['column'].unique())
-            attribute1 = hierarchy['column'].unique()[:attr_count//2]
-            attribute2 = hierarchy['column'].unique()[attr_count//2:]
-            
+            attr_count = len(hierarchy["column"].unique())
+            attribute1 = hierarchy["column"].unique()[: attr_count // 2]
+            attribute2 = hierarchy["column"].unique()[attr_count // 2 :]
+
             # 枝刈り済みのLatticeを取得
-            prunded_lattice1 = self._incognito(self.df, hierarchy[hierarchy['column'].isin(attribute1)], self.k)
-            prunded_lattice2 = self._incognito(self.df, hierarchy[hierarchy['column'].isin(attribute2)], self.k)
+            prunded_lattice1 = self._incognito(
+                self.df, hierarchy[hierarchy["column"].isin(attribute1)], self.k
+            )
+            prunded_lattice2 = self._incognito(
+                self.df, hierarchy[hierarchy["column"].isin(attribute2)], self.k
+            )
 
             # 一旦複数属性のLatticeを作成
             ## TODO: ここでLatticeを生成してから枝刈りするのは遠回りの処理なので、prunded_lattice1とprunded_lattice2を直接マージして複数属性のLatticeを構築したい
@@ -87,11 +91,13 @@ class Incognito():
 
             # 枝刈り済みのLatticeを返す
             return lattice
-    
+
     def _print_result(self) -> None:
         """
         結果を表示する
         """
         print(f"\nIncognito result:")
-        print(f"There are {len(self.result_lattice.nodes)} combinations of generalization levels satisfying k-anonymity (k={self.k}):")
+        print(
+            f"There are {len(self.result_lattice.nodes)} combinations of generalization levels satisfying k-anonymity (k={self.k}):"
+        )
         print(self.result_lattice.nodes)
