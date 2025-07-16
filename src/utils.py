@@ -16,6 +16,19 @@ hierarchy_filepaths = {
     "workclass": ".data/.hierarchy/adult_hierarchy_workclass.csv",
 }
 
+def set_verbose(verbose: bool) -> None:
+    """
+    Set the global verbose flag for logging.
+    """
+    global VERBOSE
+    VERBOSE = verbose
+
+def vprint(*args, **kwargs) -> None:
+    """
+    Print messages only if verbose mode is enabled.
+    """
+    if VERBOSE:
+        print(*args, **kwargs)
 
 def fetch_dataset(dataset_name: str = "adult") -> pd.DataFrame:
     """

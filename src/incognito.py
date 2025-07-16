@@ -1,9 +1,9 @@
 from typing import List
 import pandas as pd
 
-import utils, df_operations
+import df_operations
 from lattice import Lattice
-
+from utils import vprint
 
 class Incognito:
     def __init__(self, df: pd.DataFrame, hierarchies: pd.DataFrame, k: int) -> None:
@@ -100,6 +100,7 @@ class Incognito:
 
         # 対象の属性が1つなら、一般化してLatticeの枝切りを行う
         if len(hierarchy["column"].unique()) == 1:
+            vprint(f"Constructing Lattice for {hierarchy['column'].unique()}")
             lattice = Lattice(hierarchy).construct()
 
             # 変換Latticeの各ノードについて、k匿名性を確認し、枝刈りを行う
@@ -112,6 +113,7 @@ class Incognito:
             attr_count = len(hierarchy["column"].unique())
             attribute1 = hierarchy["column"].unique()[: attr_count // 2]
             attribute2 = hierarchy["column"].unique()[attr_count // 2 :]
+            vprint(f"Dividing into {attribute1}, {attribute2}")
 
             # 枝刈り済みのLatticeを取得
             prunded_lattice1 = self._incognito(
@@ -123,18 +125,26 @@ class Incognito:
 
             # 一旦複数属性のLatticeを作成
             ## TODO: ここでLatticeを生成してから枝刈りするのは遠回りの処理なので、prunded_lattice1とprunded_lattice2を直接マージして複数属性のLatticeを構築したい
+            vprint(f"Consttructing Lattice for {hierarchy["column"].unique()}", end=" -> ")
             lattice = Lattice(hierarchy).construct()
+            vprint(lattice.nodes.shape[0], "nodes")
 
             # 各属性の枝刈り済みLatticeをもとに、複数属性のLatticeを枝刈り
+            vprint(f"Pruning by {attribute1}", end=" -> ")
             lattice.reconstruct(prunded_lattice1)
+            vprint(lattice.nodes.shape[0], "nodes")
+            vprint(f"Pruning by {attribute2}", end=" -> ")
             lattice.reconstruct(prunded_lattice2)
+            vprint(lattice.nodes.shape[0], "nodes")
 
             # 再度枝刈り
             ## たとえば下のような例があるので、Workclassについてk-10匿名を満たしても、二つの属性を組み合わせると満たさなくなる
             ## ある属性がk匿名を満たさないなら、その上位集合はk匿名を満たさない　が、ある属性が満たすとき、上位集合も満たすとは限らない
             # Never-worked      Female        3
             #                   Male          7
+            vprint("Pruning by k-anonymity", end=" -> ")
             lattice = self._pruning(lattice, df, hierarchy, k)
+            vprint(lattice.nodes.shape[0], "nodes")
 
             return lattice
 
@@ -150,12 +160,14 @@ class Incognito:
             conditions = self._node_to_generalization_tuples(node, self.hierarchies)
             conditions_str = ", ".join(f"{dim}={level}" for dim, level in conditions)
             print(i+1, conditions_str)
+        print()
 
     def verify_result(self) -> bool:
         """
         処理後の結果の検証を行う
         return: 検証結果 (True: 正常, False: 異常)
         """
+        print("Verifying Incognito result...")
         for node in self.result_lattice.nodes.itertuples():
             conditions = self._node_to_generalization_tuples(node, self.hierarchies)
 
@@ -181,14 +193,15 @@ class Incognito:
                 f"{getattr(node, f'dim{i}')}={getattr(node, f'level{i}')}"
                 for i in range(1, num_dims + 1)
             ]
-            print(f"Checking node: {', '.join(conditions_tup)}")
+            print(f"node: {', '.join(conditions_tup)}")
             if not df_operations.is_k_anonymous(
                 generalized_df, [str(dim) for dim, _ in conditions], self.k, debug=True
             ):
-                print(f"does not satisfy k-anonymity (k={self.k}).")
+                print(f"-does not satisfy k-anonymity (k={self.k}).")
                 return False
             else:
-                print(f"satisfies k-anonymity (k={self.k}).")
+                print(f"-satisfies k-anonymity (k={self.k}).")
+            print()
 
-        print("All nodes satisfy k-anonymity.")
+        print(f"All {len(self.result_lattice.nodes)} nodes satisfy k-anonymity.")
         return True
