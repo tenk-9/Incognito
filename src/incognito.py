@@ -89,7 +89,7 @@ class Incognito:
 
         # 対象の属性が1つなら、一般化してLatticeの枝切りを行う
         if len(hierarchy["column"].unique()) == 1:
-            lattice = Lattice(hierarchy)
+            lattice = Lattice(hierarchy).construct()
 
             # 変換Latticeの各ノードについて、k匿名性を確認し、枝刈りを行う
             lattice = self._pruning(lattice, df, hierarchy, k)
@@ -112,7 +112,7 @@ class Incognito:
 
             # 一旦複数属性のLatticeを作成
             ## TODO: ここでLatticeを生成してから枝刈りするのは遠回りの処理なので、prunded_lattice1とprunded_lattice2を直接マージして複数属性のLatticeを構築したい
-            lattice = Lattice(hierarchy)
+            lattice = Lattice(hierarchy).construct()
 
             # 各属性の枝刈り済みLatticeをもとに、複数属性のLatticeを枝刈り
             lattice.reconstruct(prunded_lattice1)

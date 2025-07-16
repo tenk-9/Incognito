@@ -32,14 +32,11 @@ class Lattice:
         self.dropped_nodes = pd.DataFrame(columns=self._node_df_cols)
 
         ## 各属性について、最大の階層を取得
-        attribute_maxlevel = {}  # 属性名: 階層の最大値
+        self.attribute_maxlevel = {}  # 属性名: 階層の最大値
         for col in self.hierarchy_df["column"].unique():
             filterd_hierarchy = self.hierarchy_df[self.hierarchy_df["column"] == col]
             max_level = filterd_hierarchy["parent_level"].max()
-            attribute_maxlevel[col] = max_level
-
-        # latticeを構築
-        self._construct_lattice(attribute_maxlevel)
+            self.attribute_maxlevel[col] = max_level
 
     # def _dict2tuple(self, d: dict) -> tuple:
     #     '''
@@ -106,18 +103,15 @@ class Lattice:
             # self.edgesに追加
             self.edges.loc[len(self.edges)] = [from_idx, to_idx]
 
-    def _construct_lattice(self, attribute_maxlevel: dict) -> None:
+    def construct(self) -> "Lattice":
         """
         latticeを構築する
-        param:
-            attribute_maxlevel: 各属性の最大一般化レベルのdict
-                例: {attribute: max_level, attribute2: max_level2, ...}
         """
         bfs_queue = queue.Queue()
         found_node_ids = set()
 
         # {attribute: level}のdictを見ながらbfsする
-        root = {key: 0 for key in attribute_maxlevel.keys()}
+        root = {key: 0 for key in self.attribute_maxlevel.keys()}
 
         ## 初期化: 一般化レベルが最も低いnodeを追加
         bfs_queue.put(root)
@@ -136,7 +130,7 @@ class Lattice:
                     continue  # idx項はスキップ
 
                 # あり得たらnodeを追加、エッジを構築
-                if current_node[key] + 1 <= attribute_maxlevel[key]:
+                if current_node[key] + 1 <= self.attribute_maxlevel[key]:
                     # copyして新しいノードを作成
                     new_node = current_node.copy()
                     new_node[key] += 1
@@ -149,6 +143,7 @@ class Lattice:
                     if new_node["idx"] not in found_node_ids:
                         bfs_queue.put(new_node)
                         found_node_ids.add(new_node["idx"])
+        return self
 
     def drop_node(self, id: Union[int, float]) -> None:
         """
