@@ -118,3 +118,30 @@ def read_hierarchy(file_path: str, col_name: str) -> pd.DataFrame:
     hierarchy_df["column"] = col_name
 
     return hierarchy_df
+
+
+def read_hierarchy_official_csv(file_path: str, col_name: str) -> pd.DataFrame:
+    """
+    read hierarchy from official csv file
+    param file_path: path to the hierarchy csv file
+    return: hierarchy df
+    """
+    csv = pd.read_csv(file_path, sep=";", header=None)
+    hierarchy_df = pd.DataFrame(
+        columns=["child", "child_level", "parent", "parent_level"]
+    )
+    for child_col in range(csv.shape[1] - 1):
+        for parent_col in range(child_col + 1, csv.shape[1]):
+            csvf = csv.iloc[:, [child_col, parent_col]]
+            csvf = csvf.drop_duplicates()
+            append_df = pd.DataFrame(
+                csvf.values, columns=["child", "parent"]
+            )
+            append_df["child_level"] = child_col
+            append_df["parent_level"] = parent_col
+            hierarchy_df = pd.concat(
+                [hierarchy_df, append_df], ignore_index=True
+            )
+    hierarchy_df["column"] = col_name
+
+    return hierarchy_df
