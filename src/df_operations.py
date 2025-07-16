@@ -61,7 +61,9 @@ def replace_nan(
     return df
 
 
-def is_k_anonymous(df: pd.DataFrame, target_cols: List[str], k: int) -> bool:
+def is_k_anonymous(
+    df: pd.DataFrame, target_cols: List[str], k: int, debug: bool = False
+) -> bool:
     """
     dfがtarget_colsにおいてk-匿名であるか確認する
 
@@ -73,7 +75,8 @@ def is_k_anonymous(df: pd.DataFrame, target_cols: List[str], k: int) -> bool:
 
     # 各target_colsの組み合わせでグループ化し、サイズをカウント
     grouped = df.groupby(target_cols, dropna=False)
-    # print(grouped.size())
+    if debug:
+        print(grouped.size())
     # 各グループのサイズがk以上であるか確認
     is_k_anonymous = all(size >= k for size in grouped.size())
 

@@ -4,8 +4,6 @@ import pandas as pd
 import utils, df_operations
 from lattice import Lattice
 
-# TODO: 探索latticeの表現方法をどうしようか
-
 
 class Incognito:
     def __init__(self, df: pd.DataFrame, hierarchies: pd.DataFrame, k: int) -> None:
@@ -136,3 +134,49 @@ class Incognito:
             f"There are {len(self.result_lattice.nodes)} combinations of generalization levels satisfying k-anonymity (k={self.k}):"
         )
         print(self.result_lattice)
+
+    def verify_result(self) -> bool:
+        """
+        処理後の結果の検証を行う
+        return: 検証結果 (True: 正常, False: 異常)
+        """
+        for node in self.result_lattice.nodes.itertuples():
+            conditions = []
+            for i in range(1, len(self.result_lattice._node_df_cols[1:]) // 2 + 1):
+                dim = getattr(node, f"dim{i}")
+                level = getattr(node, f"level{i}")
+                conditions.append((dim, level))
+
+            # ノードの一般化変換を取得
+            def row_match(row):
+                return any(
+                    (row["column"] == dim)
+                    and (row["child_level"] == 0)
+                    and (row["parent_level"] == level)
+                    for dim, level in conditions
+                )
+
+            generalize_hierarchy = self.hierarchies[
+                self.hierarchies.apply(row_match, axis=1)
+            ]
+
+            # 一般化変換
+            generalized_df = df_operations.generalize(self.df, generalize_hierarchy)
+
+            # k匿名性の確認
+            num_dims = len(self.result_lattice._node_df_cols[1:]) // 2
+            conditions_tup = [
+                f"{getattr(node, f'dim{i}')}={getattr(node, f'level{i}')}"
+                for i in range(1, num_dims + 1)
+            ]
+            print(f"Checking node: {', '.join(conditions_tup)}")
+            if not df_operations.is_k_anonymous(
+                generalized_df, [str(dim) for dim, _ in conditions], self.k, debug=True
+            ):
+                print(f"does not satisfy k-anonymity (k={self.k}).")
+                return False
+            else:
+                print(f"satisfies k-anonymity (k={self.k}).")
+
+        print("All nodes satisfy k-anonymity.")
+        return True
