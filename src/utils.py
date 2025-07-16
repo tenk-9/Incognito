@@ -2,6 +2,19 @@ from ucimlrepo import fetch_ucirepo
 import pandas as pd
 import os
 
+hierarchy_filepaths = {
+    "workclass_": ".data/workClass.txt",
+    "sex_": ".data/sex.txt",
+    "age": ".data/.hierarchy/adult_hierarchy_age.csv",
+    "education": ".data/.hierarchy/adult_hierarchy_education.csv",
+    "marital-status": ".data/.hierarchy/adult_hierarchy_marital-status.csv",
+    "native-country": ".data/.hierarchy/adult_hierarchy_native-country.csv",
+    "occupation": ".data/.hierarchy/adult_hierarchy_occupation.csv",
+    "race": ".data/.hierarchy/adult_hierarchy_race.csv",
+    "salary-class": ".data/.hierarchy/adult_hierarchy_salary-class.csv",
+    "sex": ".data/.hierarchy/adult_hierarchy_sex.csv",
+    "workclass": ".data/.hierarchy/adult_hierarchy_workclass.csv",
+}
 
 def fetch_dataset() -> pd.DataFrame:
     """
@@ -145,3 +158,28 @@ def read_hierarchy_official_csv(file_path: str, col_name: str) -> pd.DataFrame:
     hierarchy_df["column"] = col_name
 
     return hierarchy_df
+
+def read_hierarchies_by_col_names(
+    col_names: list[str]
+) -> pd.DataFrame:
+    """
+    read hierarchies from files by column names
+    param col_names: list of column names to read hierarchies
+    return: concatenated hierarchy df
+    """
+    hierarchies = []
+    for col_name in col_names:
+        if col_name in hierarchy_filepaths:
+            if col_name.endswith("_"):
+                # unofficialな階層定義ファイルの場合
+                hierarchies.append(
+                    read_hierarchy(hierarchy_filepaths[col_name], col_name[:-1])
+                )
+            else:
+                # officialな階層定義ファイルの場合
+                hierarchies.append(
+                    read_hierarchy_official_csv(hierarchy_filepaths[col_name], col_name)
+                )
+        else:
+            raise ValueError(f"Unknown column name: {col_name}")
+    return pd.concat(hierarchies, ignore_index=True)
