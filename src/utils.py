@@ -16,19 +16,25 @@ hierarchy_filepaths = {
     "workclass": ".data/.hierarchy/adult_hierarchy_workclass.csv",
 }
 
-def fetch_dataset() -> pd.DataFrame:
+
+def fetch_dataset(dataset_name: str = "adult") -> pd.DataFrame:
     """
     fetch adult dataset from UCI Machine Learning Repository (https://archive.ics.uci.edu/dataset/2/adult)
     RETURN: adult dataset as a pandas dataframe
     """
+    if dataset_name not in [
+        "adult",
+    ]:
+        raise ValueError(f"Unknown dataset name: {dataset_name}")
+
     # Fetch dataset
-    if os.path.exists(".data/adult.csv"):
-        data = pd.read_csv(".data/adult.csv", index_col=0)
+    if os.path.exists(f".data/{dataset_name}.csv"):
+        data = pd.read_csv(f".data/{dataset_name}.csv", index_col=0)
     else:
         adult = fetch_ucirepo(id=2)
         data = adult.data.original
         data.columns = adult.data.headers
-        data.to_csv(".data/adult.csv")
+        data.to_csv(f".data/{dataset_name}.csv")
     return data
 
 
@@ -147,21 +153,16 @@ def read_hierarchy_official_csv(file_path: str, col_name: str) -> pd.DataFrame:
         for parent_col in range(child_col + 1, csv.shape[1]):
             csvf = csv.iloc[:, [child_col, parent_col]]
             csvf = csvf.drop_duplicates()
-            append_df = pd.DataFrame(
-                csvf.values, columns=["child", "parent"]
-            )
+            append_df = pd.DataFrame(csvf.values, columns=["child", "parent"])
             append_df["child_level"] = child_col
             append_df["parent_level"] = parent_col
-            hierarchy_df = pd.concat(
-                [hierarchy_df, append_df], ignore_index=True
-            )
+            hierarchy_df = pd.concat([hierarchy_df, append_df], ignore_index=True)
     hierarchy_df["column"] = col_name
 
     return hierarchy_df
 
-def read_hierarchies_by_col_names(
-    col_names: list[str]
-) -> pd.DataFrame:
+
+def read_hierarchies_by_col_names(col_names: list[str]) -> pd.DataFrame:
     """
     read hierarchies from files by column names
     param col_names: list of column names to read hierarchies
