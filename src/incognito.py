@@ -29,6 +29,23 @@ class Incognito:
 
         self._print_result()
 
+    def _node_to_generalization_tuples(
+        self, node, hierarchy: pd.DataFrame
+    ) -> List[tuple]:
+        """
+        ノードを一般化条件のタプルのリストに変換する
+        param node: pandasの行オブジェクト (cols: idx, dim1, level1, dim2, level2, ...)
+        param hierarchy: 一般化階層の定義df
+        return: 一般化条件のタプルのリスト [(dim1, level1), (dim2, level2), ...]
+        """
+        num_attributes = len(hierarchy["column"].unique())
+        conditions = []
+        for i in range(1, num_attributes + 1):
+            dim = getattr(node, f"dim{i}")
+            level = getattr(node, f"level{i}")
+            conditions.append((dim, level))
+        return conditions
+
     def _pruning(
         self, lattice: Lattice, df: pd.DataFrame, hierarchy: pd.DataFrame, k: int
     ) -> Lattice:
@@ -43,11 +60,7 @@ class Incognito:
         num_attributes = len(hierarchy["column"].unique())
         # 各ノードについて、k匿名性を確認し、枝刈りを行う
         for node in lattice.nodes.itertuples():
-            conditions = []
-            for i in range(1, num_attributes + 1):
-                dim = getattr(node, f"dim{i}")
-                level = getattr(node, f"level{i}")
-                conditions.append((dim, level))
+            conditions = self._node_to_generalization_tuples(node, hierarchy)
 
             # ノードの一般化変換を取得: level-0 -> level-n
             def row_match(row):
@@ -141,11 +154,7 @@ class Incognito:
         return: 検証結果 (True: 正常, False: 異常)
         """
         for node in self.result_lattice.nodes.itertuples():
-            conditions = []
-            for i in range(1, len(self.result_lattice._node_df_cols[1:]) // 2 + 1):
-                dim = getattr(node, f"dim{i}")
-                level = getattr(node, f"level{i}")
-                conditions.append((dim, level))
+            conditions = self._node_to_generalization_tuples(node, self.hierarchies)
 
             # ノードの一般化変換を取得
             def row_match(row):
