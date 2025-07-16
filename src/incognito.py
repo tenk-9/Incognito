@@ -146,7 +146,10 @@ class Incognito:
         print(
             f"There are {len(self.result_lattice.nodes)} combinations of generalization levels satisfying k-anonymity (k={self.k}):"
         )
-        print(self.result_lattice)
+        for i, node in enumerate(self.result_lattice.nodes.itertuples()):
+            conditions = self._node_to_generalization_tuples(node, self.hierarchies)
+            conditions_str = ", ".join(f"{dim}={level}" for dim, level in conditions)
+            print(i+1, conditions_str)
 
     def verify_result(self) -> bool:
         """
