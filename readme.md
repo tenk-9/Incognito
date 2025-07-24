@@ -10,3 +10,9 @@ conda create -n incognito
 conda activate incognito
 conda install python=3.12
 pip install ucimlrepo
+
+
+uv init .
+uv sync
+uv pip sync requirements.txt
+. .venv/bin/activate

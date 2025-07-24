@@ -1,9 +1,11 @@
 from typing import List
 import pandas as pd
+import queue
 
 import df_operations
 from lattice import Lattice
 from utils import vprint
+
 
 class Incognito:
     def __init__(self, df: pd.DataFrame, hierarchies: pd.DataFrame, k: int) -> None:
@@ -59,6 +61,7 @@ class Incognito:
         """
         num_attributes = len(hierarchy["column"].unique())
         # 各ノードについて、k匿名性を確認し、枝刈りを行う
+        # TODO: priningもBFSで
         for node in lattice.nodes.itertuples():
             conditions = self._node_to_generalization_tuples(node, hierarchy)
 
@@ -125,9 +128,13 @@ class Incognito:
 
             # 一旦複数属性のLatticeを作成
             ## TODO: ここでLatticeを生成してから枝刈りするのは遠回りの処理なので、prunded_lattice1とprunded_lattice2を直接マージして複数属性のLatticeを構築したい
-            vprint(f"Consttructing Lattice for {hierarchy["column"].unique()}", end=" -> ")
+            vprint(
+                f"Consttructing Lattice for {hierarchy['column'].unique()}", end=" -> "
+            )
             lattice = Lattice(hierarchy).construct()
             vprint(lattice.nodes.shape[0], "nodes")
+
+            prunded_lattice1.merge_with(prunded_lattice2)
 
             # 各属性の枝刈り済みLatticeをもとに、複数属性のLatticeを枝刈り
             vprint(f"Pruning by {attribute1}", end=" -> ")
@@ -159,7 +166,7 @@ class Incognito:
         for i, node in enumerate(self.result_lattice.nodes.itertuples()):
             conditions = self._node_to_generalization_tuples(node, self.hierarchies)
             conditions_str = ", ".join(f"{dim}={level}" for dim, level in conditions)
-            print(i+1, conditions_str)
+            print(i + 1, conditions_str)
         print()
 
     def verify_result(self) -> bool:
@@ -188,7 +195,7 @@ class Incognito:
             generalized_df = df_operations.generalize(self.df, generalize_hierarchy)
 
             # k匿名性の確認
-            num_dims = len(self.result_lattice._node_df_cols[1:]) // 2
+            num_dims = self.result_lattice.num_attributes
             conditions_tup = [
                 f"{getattr(node, f'dim{i}')}={getattr(node, f'level{i}')}"
                 for i in range(1, num_dims + 1)
@@ -205,3 +212,166 @@ class Incognito:
 
         print(f"All {len(self.result_lattice.nodes)} nodes satisfy k-anonymity.")
         return True
+
+
+from node import Node
+import itertools
+
+
+class Lattice_:
+    def __init__(self, hierarchy: pd.DataFrame) -> None:
+        """
+        Q: 準識別子のリスト
+        """
+        self.nodes: List["Node"] = []
+        self.Q: List[str] = hierarchy["column"].unique().tolist()
+        self.hierarchy: pd.DataFrame = hierarchy
+        self.attributes: int = 0
+
+    def _single_attribute_initialization(self) -> None:
+        """
+        単一属性の一般化について初期化、Incognitoの初期条件
+        """
+        # 単一属性について一般化変換を構築
+        for q in self.Q:
+            tmp_nodes = []
+            # 一般化の定義を取得
+            generalizations = self.hierarchy[self.hierarchy["column"] == q]
+            max_generalization_level = generalizations["parent_level"].max()
+            for generalization_level in range(max_generalization_level + 1):
+                # ノードを生成
+                node = Node({q: generalization_level})
+                tmp_nodes.append(node)
+            # 親子関係を構築
+            for i in range(
+                1, len(tmp_nodes)
+            ):  # rootはそこに至るノードがないのでスキップ
+                # それ以外は前のノードをfromにする
+                tmp_nodes[i].add_src_node(tmp_nodes[i - 1])
+                tmp_nodes[i - 1].add_dst_node(tmp_nodes[i])
+
+            self.nodes.extend(tmp_nodes)
+
+    def _node_generation(self) -> None:
+        """
+        属性数+1のノードを生成する
+        """
+        # i個の属性があるとき、i-1個目までの属性とレベルが同じ かつ i個目の属性が左<右
+        active_nodes = []
+        new_nodes = []
+        for node in self.nodes:
+            if not node.deleted:
+                active_nodes.append(node)
+
+        for p, q in itertools.combinations(active_nodes, 2):
+            # for p in range(len(active_nodes)):
+            #     for q in range(p+1, len(active_nodes)):
+            # p_attr = active_nodes[p].generalization
+            # q_attr = active_nodes[q].generalization
+            # p_attr_keys = list(p_attr.keys())
+            # q_attr_keys = list(q_attr.keys())
+            p_attr_keys = list(p.generalization.keys())
+            q_attr_keys = list(q.generalization.keys())
+            if len(p_attr_keys) == 1 and len(q_attr_keys) == 1:
+                # 単一属性の比較
+                if p_attr_keys[0] != q_attr_keys[0]:
+                    new_nodes.append(Node(p.generalization | q.generalization))
+            else:
+                if (
+                    p_attr_keys[:-1] == q_attr_keys[:-1]
+                    and p_attr_keys[-1] < q_attr_keys[-1]
+                ):
+                    new_nodes.append(Node(p.generalization | q.generalization))
+        self.nodes = new_nodes
+        print(len(self.nodes), "nodes generated.")
+
+    def increment_attributes(self) -> None:
+        """
+        属性の数を1増やす
+        """
+        if self.attributes == 0:
+            self._single_attribute_initialization()
+            self.attributes += 1
+        else:
+            # 複数属性の一般化について初期化
+            # GraphGeneration
+
+            # node_generation
+            self._node_generation()
+
+            # TODO: edge generation
+
+            raise NotImplementedError(
+                "Multiple attribute generalization is not implemented yet."
+            )
+
+
+class Incognito_:
+    def __init__(self, T: pd.DataFrame, hierarchy: pd.DataFrame, k: int) -> None:
+        self.T: pd.DataFrame = T  # 対象のテーブル
+        self.Q: List[str] = hierarchy["column"].unique().tolist()  # 準識別子のリスト
+        self.hierarchy: pd.DataFrame = hierarchy  # 一般化階層の定義df
+        self.k: int = k  # k-匿名性のk値
+        self.lattice: Lattice_  # 構築済みのLattice
+
+    def run(self) -> pd.DataFrame:
+        """
+        Incognitoの実行
+        return: 一般化されたDataFrame
+        """
+        self.lattice = Lattice_(self.hierarchy)
+        self.lattice.increment_attributes()  # initialization of the lattice
+        priority_queue = queue.PriorityQueue()
+
+        # 属性の組み合わせ数をボトムアップしていく
+        for attributes in range(len(self.Q)):
+            # nodeの高さによる優先度付きqueue
+            for node in self.lattice.nodes:
+                ## rootを流し込んで初期化
+                if node.is_root() and not node.deleted:
+                    priority_queue.put(node)
+
+            while not priority_queue.empty():
+                node = priority_queue.get()
+
+                # k匿名を満たすとしてマークされていたら、スキップ
+                if node.is_marked() or node.deleted:
+                    continue
+                else:
+                    # nodeに定義された一般化変換に従い、一般化を実施、k匿名性を検証
+                    # ノードの一般化変換を取得: level-0 -> level-n
+                    def row_match(row):
+                        # すべての(dim, level)条件を満たすか
+                        result = any(
+                            (row["column"] == dim)
+                            and (row["child_level"] == 0)
+                            and (row["parent_level"] == level)
+                            for dim, level in node.generalization.items()
+                        )
+                        return result
+
+                    valid_generalization = self.hierarchy[
+                        self.hierarchy.apply(row_match, axis=1)
+                    ]
+                    # 一般化を適用
+                    generalized_df = df_operations.generalize(
+                        self.T, valid_generalization
+                    )
+                    # k匿名性の確認
+                    k_anonymous = df_operations.is_k_anonymous(
+                        generalized_df, list(node.generalization.keys()), self.k
+                    )
+
+                    # k匿名性を満たすなら、ノードとその直親をマーク
+                    if k_anonymous:
+                        node.mark()
+                        for dst_node in node.to_nodes:
+                            dst_node.mark()
+
+                    # k匿名でないとき、一段上のノードを優先度付きqueueに追加
+                    else:
+                        for dst_node in node.to_nodes:
+                            priority_queue.put(dst_node)
+                        node.delete()
+            # attributesを増やし、Latticeを更新
+            self.lattice.increment_attributes()

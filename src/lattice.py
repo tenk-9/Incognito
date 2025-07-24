@@ -1,7 +1,26 @@
 import pandas as pd
 import queue
+import itertools
 
 from typing import Union
+
+
+class AttributeLevelRange:
+    """
+    属性の一般化レベルの範囲を表現するクラス
+        min: 最小レベル
+        max: 最大レベル
+    """
+
+    def __init__(self, min_level: int, max_level: int) -> None:
+        self.min_level = min_level
+        self.max_level = max_level
+
+    def __contains__(self, level: int) -> bool:
+        """
+        レベルが範囲内にあるか確認する
+        """
+        return self.min_level <= level <= self.max_level
 
 
 class Lattice:
@@ -23,20 +42,21 @@ class Lattice:
         self.edges = pd.DataFrame(columns=["from", "to"])
         self.dropped_edges = pd.DataFrame(columns=["from", "to"])
         ## nodes
-        dimensions = self.hierarchy_df["column"].unique().shape[0]
+        self.num_attributes = self.hierarchy_df["column"].unique().shape[0]
         self._node_df_cols = ["idx"]
-        for i in range(dimensions):
+        for i in range(self.num_attributes):
             self._node_df_cols.append(f"dim{i + 1}")
             self._node_df_cols.append(f"level{i + 1}")
         self.nodes = pd.DataFrame(columns=self._node_df_cols)
         self.dropped_nodes = pd.DataFrame(columns=self._node_df_cols)
 
         ## 各属性について、最大の階層を取得
-        self.attribute_maxlevel = {}  # 属性名: 階層の最大値
+        self.attribute_level_ranges = {}  # 属性名: 階層の最大値
         for col in self.hierarchy_df["column"].unique():
-            filterd_hierarchy = self.hierarchy_df[self.hierarchy_df["column"] == col]
-            max_level = filterd_hierarchy["parent_level"].max()
-            self.attribute_maxlevel[col] = max_level
+            filtered_hierarchy = self.hierarchy_df[self.hierarchy_df["column"] == col]
+            max_level = filtered_hierarchy["parent_level"].max()
+            min_level = filtered_hierarchy["parent_level"].min()
+            self.attribute_level_ranges[col] = AttributeLevelRange(min_level, max_level)
 
     # def _dict2tuple(self, d: dict) -> tuple:
     #     '''
@@ -111,7 +131,7 @@ class Lattice:
         found_node_ids = set()
 
         # {attribute: level}のdictを見ながらbfsする
-        root = {key: 0 for key in self.attribute_maxlevel.keys()}
+        root = {key: 0 for key, value in self.attribute_level_ranges.items()}
 
         ## 初期化: 一般化レベルが最も低いnodeを追加
         bfs_queue.put(root)
@@ -130,7 +150,7 @@ class Lattice:
                     continue  # idx項はスキップ
 
                 # あり得たらnodeを追加、エッジを構築
-                if current_node[key] + 1 <= self.attribute_maxlevel[key]:
+                if current_node[key] + 1 in self.attribute_level_ranges[key]:
                     # copyして新しいノードを作成
                     new_node = current_node.copy()
                     new_node[key] += 1
@@ -150,9 +170,8 @@ class Lattice:
         idのノードを削除する
         """
         # idのノードを削除
-        self.dropped_nodes = pd.concat(
-            [self.dropped_nodes, self.nodes[self.nodes["idx"] == id]]
-        )
+        tar_node = self.nodes[self.nodes["idx"] == id]
+        self.dropped_nodes = pd.concat([self.dropped_nodes, tar_node])
         self.nodes = self.nodes[self.nodes["idx"] != id]
 
         # idのノードに関連するエッジを削除
@@ -180,6 +199,39 @@ class Lattice:
         for id in dropping_nodes["idx_x"]:
             # ノードを削除
             self.drop_node(id)
+
+    def merge_with(self, other: "Lattice") -> "Lattice":
+        """
+        引数に取ったLatticeとselfをマージする
+        nodesの直積をとり、エッジを再構築
+        新しいLatticeインスタンスを返す
+        param other: マージ対象のLattice
+        return: 新しいLatticeインスタンス
+        """
+        new_lattice = Lattice(pd.concat([self.hierarchy_df, other.hierarchy_df], ignore_index=True))
+        
+        # ノードの直積をとる
+        self_nodes = self.nodes.drop(columns=["idx"])  # idxは除外
+        other_nodes = other.nodes.drop(columns=["idx"])  # idxは除外
+        new_nodes = pd.merge(self_nodes, other_nodes, how="cross")
+
+        node_df_cols = []
+        for i in range(len(new_nodes.columns) // 2):
+            node_df_cols.append(f"dim{i + 1}")
+            node_df_cols.append(f"level{i + 1}")
+
+        new_nodes.columns = node_df_cols
+        # idx列を追加
+        new_nodes["idx"] = range(len(new_nodes))
+
+        new_lattice.nodes = new_nodes
+
+
+        # 各ノードペアについて、エッジを再構築
+        for node1, node2 in itertools.combinations(new_nodes.index, 2):
+            
+            continue
+        print(f"node1: {new_nodes.loc[node1]}, node2: {new_nodes.loc[node2]}")
 
     def __str__(self) -> str:
         """
