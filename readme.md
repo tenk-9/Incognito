@@ -14,5 +14,6 @@ pip install ucimlrepo
 
 uv init .
 uv sync
+uv add 
 uv pip sync requirements.txt
 . .venv/bin/activate

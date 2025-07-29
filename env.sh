@@ -1,1 +1,1 @@
-conda activate incognito
+source .venv/bin/activate

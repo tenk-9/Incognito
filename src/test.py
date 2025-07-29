@@ -27,11 +27,15 @@ adult = utils.fetch_dataset()
 print("Reading generalization hierarchies for target quasi-identifiers...")
 hierarchy = utils.read_hierarchies_by_col_names(
     [
-        'workclass_',
+        'workclass',
         'sex',
         'education',
         'marital-status',
         'age',
+        'native-country',
+        # 'occupation',
+        # 'salary-class',
+        # 'race', 
     ]
 )
 
@@ -59,6 +63,10 @@ print("Starting Incognito...")
 # incognito_result = Incognito(adult, hierarchy, 20)
 # incognito_result.verify_result()
 utils.set_verbose(True)
-icg = Incognito_(adult, hierarchy, 100).run()
+adult = adult.dropna()
+icg = Incognito_(adult, hierarchy, 2)
+icg.run()
+icg._print_result()
+icg.verify_result()
 # icg._print_result()
 # icg._verify_result()

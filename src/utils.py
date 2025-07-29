@@ -170,8 +170,12 @@ def read_hierarchy_official_csv(file_path: str, col_name: str) -> pd.DataFrame:
             append_df["child_level"] = child_col
             append_df["parent_level"] = parent_col
             hierarchy_df = pd.concat([hierarchy_df, append_df], ignore_index=True)
+   
+    # csvとdatatable上のcol名が違うものは置換する
+    if col_name == 'salary-class':
+        col_name = 'income'
+        
     hierarchy_df["column"] = col_name
-
     return hierarchy_df
 
 

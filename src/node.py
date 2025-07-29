@@ -17,9 +17,9 @@ class Node:
     }
     """
 
-    def __init__(self, generalization: dict, **kwargs):
+    def __init__(self, generalization: List[tuple], **kwargs):
         self.height: int
-        self.generalization: dict = generalization
+        self.generalization: List[tuple] = generalization # [(column, level), ...]
         self.from_nodes: list["Node"] = []
         self.to_nodes: list["Node"] = []
         self.marked: bool = False
@@ -27,7 +27,7 @@ class Node:
         self.graph_gen_parents: list["Node"] = []
 
         # init height
-        self.height = sum(self.generalization.values())
+        self.height = sum([tup[1] for tup in self.generalization])
 
     def is_root(self) -> bool:
         """
@@ -80,3 +80,13 @@ class Node:
         self.deleted = True
         for dst_node in self.to_nodes:
             dst_node.from_nodes.remove(self)
+    
+    
+    
+    def __hash__(self):
+        """
+        Nodeオブジェクトのハッシュ値をgeneralization辞書の内容に基づいて定義
+        辞書はハッシュ不可能なので、タプルに変換してハッシュ値を計算
+        """
+        # 辞書のitemsをソートしてタプルに変換することで、キーの順序が異なっても同じハッシュ値になるようにする
+        return hash(frozenset(self.generalization.items()))
