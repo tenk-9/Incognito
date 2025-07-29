@@ -256,9 +256,21 @@ class Lattice_:
         """
         属性数+1のノードを生成する
         """
+        def diff_attr(p: dict, q: dict) -> List[str]:
+            """
+            pとqの属性が異なるか確認する
+            異なった属性を返す
+            """
+            keys = set(p.keys()) | set(q.keys())
+            diff_key = []
+            for k in keys:
+                if k not in p.keys() or k not in q.keys():
+                    diff_key.append(k)
+            return diff_key
+            
         # i個の属性があるとき、i-1個目までの属性とレベルが同じ かつ i個目の属性が左<右
         active_nodes = []
-        new_nodes = []
+        new_nodes_tmp = []  # edgeを張る前の一時的なnodeのリスト
         for node in self.nodes:
             if not node.deleted:
                 active_nodes.append(node)
@@ -275,15 +287,70 @@ class Lattice_:
             if len(p_attr_keys) == 1 and len(q_attr_keys) == 1:
                 # 単一属性の比較
                 if p_attr_keys[0] != q_attr_keys[0]:
-                    new_nodes.append(Node(p.generalization | q.generalization))
+                    append_node = Node(p.generalization | q.generalization)
+                    append_node.add_inclement_parent([p, q])
+                    new_nodes_tmp.append(append_node)
             else:
+                diff_attributes = diff_attr(p.generalization, q.generalization)
                 if (
-                    p_attr_keys[:-1] == q_attr_keys[:-1]
-                    and p_attr_keys[-1] < q_attr_keys[-1]
+                    len(diff_attributes) == 1
+                    and p_attr_keys[diff_attributes[0]] < q_attr_keys[diff_attributes[0]]
                 ):
-                    new_nodes.append(Node(p.generalization | q.generalization))
-        self.nodes = new_nodes
-        print(len(self.nodes), "nodes generated.")
+                    append_node = Node(p.generalization | q.generalization)
+                    append_node.add_inclement_parent([p, q])
+                    new_nodes_tmp.append(append_node)
+
+        print(len(new_nodes_tmp), "nodes generated.")
+        self.nodes = new_nodes_tmp
+
+    def _edge_generation(self) -> None:
+        """
+        ノード間のエッジを生成する
+        """
+        new_nodes = []  # edgeを張りなおしたnodeのリスト
+        for p, q in itertools.permutations(self.nodes, 2):
+            # node上で親子関係があるのは、p,qについて
+            # 1: 親1が同じで、親2同士に一般化関係がある場合
+            # 2: 親1同士に一般化関係があり、親2が同じ場合
+            # 3: 親1同士、親2同士の両方に一般化関係がある場合
+            # p -> q のエッジを生成することを考える、permutationsなので逆のパターンも知覚できる
+
+            # 親1: from_nodes[0]
+            # 親2: from_nodes[1]
+
+            # 1: 親1が同じ and 親2にはp -> qの一般化関係がある場合
+            cond_1 = (p.graph_gen_parents[0] == q.graph_gen_parents[0]) and (
+                q.graph_gen_parents[1] in p.graph_gen_parents[1].to_nodes
+                and p.graph_gen_parents[1] in q.graph_gen_parents[1].from_nodes
+            )
+
+            # 2: 親1にはp -> qの一般化関係がある and 親2が同じ場合
+            cond_2 = (p.graph_gen_parents[1] == q.graph_gen_parents[1]) and (
+                q.graph_gen_parents[0] in p.graph_gen_parents[0].to_nodes
+                and p.graph_gen_parents[0] in q.graph_gen_parents[0].from_nodes
+            )
+
+            # 3: 親1同士に一般化関係がある and 親2同士に一般化関係がある場合
+            cond_3 = (
+                q.graph_gen_parents[0] in p.graph_gen_parents[0].to_nodes
+                and p.graph_gen_parents[0] in q.graph_gen_parents[0].from_nodes
+            ) and (
+                q.graph_gen_parents[1] in p.graph_gen_parents[1].to_nodes
+                and p.graph_gen_parents[1] in q.graph_gen_parents[1].from_nodes
+            )
+
+            if cond_1 or cond_2 or cond_3:
+                # p -> q のエッジを追加したnodeのリストを生成
+                p.add_dst_node(q)
+                q.add_src_node(p)
+
+    def graph_generation(self) -> None:
+        """
+        属性を+1したLatticeを生成する
+        """
+        self._node_generation()
+        self._edge_generation()
+        self.attributes += 1
 
     def increment_attributes(self) -> None:
         """
@@ -291,19 +358,9 @@ class Lattice_:
         """
         if self.attributes == 0:
             self._single_attribute_initialization()
-            self.attributes += 1
         else:
-            # 複数属性の一般化について初期化
-            # GraphGeneration
-
-            # node_generation
-            self._node_generation()
-
-            # TODO: edge generation
-
-            raise NotImplementedError(
-                "Multiple attribute generalization is not implemented yet."
-            )
+            self.graph_generation()
+        self.attributes += 1
 
 
 class Incognito_:
@@ -320,11 +377,17 @@ class Incognito_:
         return: 一般化されたDataFrame
         """
         self.lattice = Lattice_(self.hierarchy)
-        self.lattice.increment_attributes()  # initialization of the lattice
+        # self.lattice.increment_attributes()  # initialization of the lattice
         priority_queue = queue.PriorityQueue()
 
         # 属性の組み合わせ数をボトムアップしていく
         for attributes in range(len(self.Q)):
+            vprint(f"Processing attributes: {attributes + 1} / {len(self.Q)}")
+            self.lattice.increment_attributes()
+            vprint(
+                "Current lattice nodes:",
+                len([node for node in self.lattice.nodes if not node.deleted]),
+            )
             # nodeの高さによる優先度付きqueue
             for node in self.lattice.nodes:
                 ## rootを流し込んで初期化
@@ -350,17 +413,23 @@ class Incognito_:
                         )
                         return result
 
-                    valid_generalization = self.hierarchy[
+                    eval_generalization = self.hierarchy[
                         self.hierarchy.apply(row_match, axis=1)
                     ]
                     # 一般化を適用
                     generalized_df = df_operations.generalize(
-                        self.T, valid_generalization
+                        self.T, eval_generalization
+                    )
+                    vprint(
+                        generalized_df.groupby(
+                            list(node.generalization.keys()), dropna=False
+                        ).size()
                     )
                     # k匿名性の確認
                     k_anonymous = df_operations.is_k_anonymous(
                         generalized_df, list(node.generalization.keys()), self.k
                     )
+                    vprint(k_anonymous)
 
                     # k匿名性を満たすなら、ノードとその直親をマーク
                     if k_anonymous:
@@ -373,5 +442,64 @@ class Incognito_:
                         for dst_node in node.to_nodes:
                             priority_queue.put(dst_node)
                         node.delete()
-            # attributesを増やし、Latticeを更新
-            self.lattice.increment_attributes()
+                        vprint("pruned")
+
+        print([node.generalization for node in self.lattice.nodes if not node.deleted])
+
+    # def _print_result(self) -> None:
+    #     """
+    #     結果を表示する
+    #     """
+    #     print(f"\nIncognito result:")
+    #     print(
+    #         f"There are {len(self.lattice.nodes)} combinations of generalization levels satisfying k-anonymity (k={self.k}):"
+    #     )
+    #     for i, node in enumerate(self.lattice.nodes.itertuples()):
+    #         conditions = self._node_to_generalization_tuples(node, self.hierarchies)
+    #         conditions_str = ", ".join(f"{dim}={level}" for dim, level in conditions)
+    #         print(i + 1, conditions_str)
+    #     print()
+
+    # def verify_result(self) -> bool:
+    #     """
+    #     処理後の結果の検証を行う
+    #     return: 検証結果 (True: 正常, False: 異常)
+    #     """
+    #     print("Verifying Incognito result...")
+    #     for node in self.result_lattice.nodes.itertuples():
+    #         conditions = self._node_to_generalization_tuples(node, self.hierarchies)
+
+    #         # ノードの一般化変換を取得
+    #         def row_match(row):
+    #             return any(
+    #                 (row["column"] == dim)
+    #                 and (row["child_level"] == 0)
+    #                 and (row["parent_level"] == level)
+    #                 for dim, level in conditions
+    #             )
+
+    #         generalize_hierarchy = self.hierarchies[
+    #             self.hierarchies.apply(row_match, axis=1)
+    #         ]
+
+    #         # 一般化変換
+    #         generalized_df = df_operations.generalize(self.df, generalize_hierarchy)
+
+    #         # k匿名性の確認
+    #         num_dims = self.result_lattice.num_attributes
+    #         conditions_tup = [
+    #             f"{getattr(node, f'dim{i}')}={getattr(node, f'level{i}')}"
+    #             for i in range(1, num_dims + 1)
+    #         ]
+    #         print(f"node: {', '.join(conditions_tup)}")
+    #         if not df_operations.is_k_anonymous(
+    #             generalized_df, [str(dim) for dim, _ in conditions], self.k, debug=True
+    #         ):
+    #             print(f"-does not satisfy k-anonymity (k={self.k}).")
+    #             return False
+    #         else:
+    #             print(f"-satisfies k-anonymity (k={self.k}).")
+    #         print()
+
+    #     print(f"All {len(self.result_lattice.nodes)} nodes satisfy k-anonymity.")
+    #     return True

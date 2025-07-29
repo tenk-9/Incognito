@@ -30,8 +30,8 @@ hierarchy = utils.read_hierarchies_by_col_names(
         'workclass_',
         'sex',
         'education',
-        # 'marital-status',
-        # 'age',
+        'marital-status',
+        'age',
     ]
 )
 
@@ -58,5 +58,7 @@ print("Generalization hierarchies read successfully.")
 print("Starting Incognito...")
 # incognito_result = Incognito(adult, hierarchy, 20)
 # incognito_result.verify_result()
-
-icg = Incognito_(adult, hierarchy, 20).run()
+utils.set_verbose(True)
+icg = Incognito_(adult, hierarchy, 100).run()
+# icg._print_result()
+# icg._verify_result()

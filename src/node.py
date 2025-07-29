@@ -1,3 +1,5 @@
+from typing import List
+
 class Node:
     """
     一般化変換のLatticeを構築するNodeクラス
@@ -22,6 +24,7 @@ class Node:
         self.to_nodes: list["Node"] = []
         self.marked: bool = False
         self.deleted: bool = False
+        self.graph_gen_parents: list["Node"] = []
 
         # init height
         self.height = sum(self.generalization.values())
@@ -58,6 +61,13 @@ class Node:
         param src: fromノード
         """
         self.from_nodes.append(src)
+    
+    def add_inclement_parent(self, parent: List["Node"]) -> None:
+        """
+        一般化レベルが上がる親ノードを追加する
+        param parent: 親ノード
+        """
+        self.graph_gen_parents.extend(parent)
 
     def __lt__(self, other):
         """PriorityQueueでの比較用, heightで比較"""
