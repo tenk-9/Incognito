@@ -69,4 +69,8 @@ incognito = Incognito(dataset, hierarchy, args.k)
 incognito.run()
 incognito.print_result()
 if utils.VERBOSE:
-    incognito.verify_result()  # dropna後のデータを渡す
+    incognito.verify_result()
+
+# result here
+result = incognito.get_result()
+print(result)

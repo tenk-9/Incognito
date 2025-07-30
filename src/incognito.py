@@ -95,6 +95,39 @@ class Incognito:
         ]
         return result_generalizations
 
+    def get_result(self) -> dict:
+        """
+        Incognitoの結果を取得
+        return: 一般化変換の(key, level)のペアのリスト: [(workclass, 1), (sex, 1), ...]
+            {
+                List[tuple]: pd.Dataframe,
+                List[tuple]: pd.Dataframe,
+                ...
+            }
+        """
+        generalizations = [node.generalization for node in self.lattice.nodes if not node.deleted]
+        result = {}
+
+        for generalization in generalizations:
+            def row_match(row):
+                return any(
+                    (row["column"] == dim)
+                    and (row["child_level"] == 0)
+                    and (row["parent_level"] == level)
+                    for (dim, level) in generalization
+                )
+
+            generalize_hierarchy = self.hierarchy[
+                self.hierarchy.apply(row_match, axis=1)
+            ]
+
+            # 一般化変換
+            generalized_df = df_operations.generalize(self.T, generalize_hierarchy)
+
+            result[tuple(sorted(generalization, key=lambda x: x[0]))] = generalized_df
+
+        return result
+
     def print_result(self) -> None:
         """
         結果を表示する
