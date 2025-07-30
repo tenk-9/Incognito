@@ -42,6 +42,12 @@ parser.add_argument(
     action="store_true",
     help="Drops records which includes NaN.",
 )
+parser.add_argument(
+    "--size_limit",
+    type=int,
+    default=None,
+    help="FOR DEBUG: Limit the size of the dataset to this number of records. If None, all records are used.",
+)
 
 args = parser.parse_args()
 utils.set_verbose(args.verbose)
@@ -50,6 +56,11 @@ utils.set_verbose(args.verbose)
 vprint("Fetching dataset:", args.dataset)
 dataset = utils.fetch_dataset(args.dataset)
 vprint(f"Dataset fetched: {dataset.shape[0]} records.")
+
+# limit dataset size if specified
+if args.size_limit is not None:
+    dataset = dataset.head(args.size_limit)
+    vprint(f"Dataset limited into {dataset.shape[0]} records.")
 
 # drop nan if specified
 if args.dropna:
@@ -73,4 +84,4 @@ if utils.VERBOSE:
 
 # result here
 result = incognito.get_result()
-print(result)
+vprint(result)
