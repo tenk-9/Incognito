@@ -105,10 +105,13 @@ class Incognito:
                 ...
             }
         """
-        generalizations = [node.generalization for node in self.lattice.nodes if not node.deleted]
+        generalizations = [
+            node.generalization for node in self.lattice.nodes if not node.deleted
+        ]
         result = {}
 
         for generalization in generalizations:
+
             def row_match(row):
                 return any(
                     (row["column"] == dim)

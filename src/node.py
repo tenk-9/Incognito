@@ -1,5 +1,6 @@
 from typing import List
 
+
 class Node:
     """
     一般化変換のLatticeを構築するNodeクラス
@@ -19,7 +20,7 @@ class Node:
 
     def __init__(self, generalization: List[tuple], **kwargs):
         self.height: int
-        self.generalization: List[tuple] = generalization # [(column, level), ...]
+        self.generalization: List[tuple] = generalization  # [(column, level), ...]
         self.from_nodes: list["Node"] = []
         self.to_nodes: list["Node"] = []
         self.marked: bool = False
@@ -61,7 +62,7 @@ class Node:
         param src: fromノード
         """
         self.from_nodes.append(src)
-    
+
     def add_inclement_parent(self, parent: List["Node"]) -> None:
         """
         一般化レベルが上がる親ノードを追加する
@@ -80,9 +81,7 @@ class Node:
         self.deleted = True
         for dst_node in self.to_nodes:
             dst_node.from_nodes.remove(self)
-    
-    
-    
+
     def __hash__(self):
         """
         Nodeオブジェクトのハッシュ値をgeneralization辞書の内容に基づいて定義

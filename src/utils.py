@@ -214,6 +214,8 @@ def dropna(df: pd.DataFrame) -> pd.DataFrame:
     """
     df = df.replace("?", pd.NA)  # '?'をNaNに置換
     df = df.dropna(axis=0, how="any")
-    df = df.reset_index(drop=True)  # 欠番があるとgeneralizaのwhere句で存在しないインデックスを参照してNaNが生えてしまう
+    df = df.reset_index(
+        drop=True
+    )  # 欠番があるとgeneralizaのwhere句で存在しないインデックスを参照してNaNが生えてしまう
 
     return df

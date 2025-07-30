@@ -3,6 +3,7 @@ import pandas as pd
 import utils, df_operations
 from lattice import Lattice
 from incognito import Incognito
+
 # fetch dataset
 adult = utils.fetch_dataset()
 
@@ -23,19 +24,18 @@ adult = utils.fetch_dataset()
 # fetch_dataset_csv()
 
 
-
 print("Reading generalization hierarchies for target quasi-identifiers...")
 hierarchy = utils.read_hierarchies_by_col_names(
     [
-        'workclass',
-        'sex',
-        'education',
-        'marital-status',
-        'age',
-        'native-country',
+        "workclass",
+        "sex",
+        "education",
+        "marital-status",
+        "age",
+        "native-country",
         # 'occupation',
         # 'salary-class',
-        # 'race', 
+        # 'race',
     ]
 )
 
