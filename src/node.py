@@ -9,12 +9,12 @@ class Node:
     to_nodes: このノードから出るエッジを持つノードのリスト
 
     generalization should be:
-    {
-        "dim1": level1,
-        "dim2": level2,
+    [
+        ("dim1", level1),
+        ("dim2", level2),
         ...
-        "dimN": levelN
-    }
+        ("dimN", levelN)
+    ]
     """
 
     def __init__(self, generalization: List[tuple], **kwargs):
