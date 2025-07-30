@@ -212,8 +212,8 @@ def dropna(df: pd.DataFrame) -> pd.DataFrame:
     param df: Input DataFrame
     return: DataFrame with rows containing NaN in specified columns dropped
     """
-    _df = df.copy()
-    _df = _df.replace("?", pd.NA)  # '?'をNaNに置換
-    _df = _df.dropna(axis=0, how="any")
+    df = df.replace("?", pd.NA)  # '?'をNaNに置換
+    df = df.dropna(axis=0, how="any")
+    df = df.reset_index(drop=True)  # 欠番があるとgeneralizaのwhere句で存在しないインデックスを参照してNaNが生えてしまう
 
-    return _df
+    return df

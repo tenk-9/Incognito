@@ -27,16 +27,15 @@ def generalize(df: pd.DataFrame, hierarchy_df: pd.DataFrame) -> pd.DataFrame:
             ["child", "parent"]
         ]
 
-        # 各列について一般化規則を反映
-        merged = generalized_df[[generalize_col]].merge(
+        # 各列について一般化規則を反映（インデックスを維持）
+        merged = generalized_df[[generalize_col]].reset_index().merge(
             mapping, left_on=generalize_col, right_on="child", how="left"
+        ).set_index('index')
+        
+        # インデックスを維持したまま一般化を適用
+        generalized_df[generalize_col] = merged["parent"].where(
+            merged["parent"].notna(), merged[generalize_col]
         )
-        # generalized_df[generalize_col] = merged["parent"].where(
-        #     merged["parent"].notna(), merged[generalize_col]
-        # )
-        generalized_df[generalize_col] = merged["parent"]
-        # generalized_df = utils.dropna(generalized_df)
-
     return generalized_df
 
 
