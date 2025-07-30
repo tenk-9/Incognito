@@ -1,243 +1,150 @@
 import pandas as pd
-import queue
 import itertools
+from typing import List
 
-from typing import Union
-
-
-class AttributeLevelRange:
-    """
-    属性の一般化レベルの範囲を表現するクラス
-        min: 最小レベル
-        max: 最大レベル
-    """
-
-    def __init__(self, min_level: int, max_level: int) -> None:
-        self.min_level = min_level
-        self.max_level = max_level
-
-    def __contains__(self, level: int) -> bool:
-        """
-        レベルが範囲内にあるか確認する
-        """
-        return self.min_level <= level <= self.max_level
+from .node import Node
+from .utils import vprint
 
 
 class Lattice:
-    """
-    Latticeを表現するクラス
-    Attributes:
-        hierarchy_df: 一般化階層の定義df
-        nodes: ノードを表すdf
-        ndges: エッジを表すdf
-        dropped_nodes: 探索によって狩られたノードを表すdf
-        dropped_edges: 探索によって狩られたエッジを表すdf
-    """
-
-    def __init__(self, hierarchy_df: pd.DataFrame) -> None:
-        # init attributes
-        ## hierarchy
-        self.hierarchy_df = hierarchy_df
-        ## edges
-        self.edges = pd.DataFrame(columns=["from", "to"])
-        self.dropped_edges = pd.DataFrame(columns=["from", "to"])
-        ## nodes
-        self.num_attributes = self.hierarchy_df["column"].unique().shape[0]
-        self._node_df_cols = ["idx"]
-        for i in range(self.num_attributes):
-            self._node_df_cols.append(f"dim{i + 1}")
-            self._node_df_cols.append(f"level{i + 1}")
-        self.nodes = pd.DataFrame(columns=self._node_df_cols)
-        self.dropped_nodes = pd.DataFrame(columns=self._node_df_cols)
-
-        ## 各属性について、最大の階層を取得
-        self.attribute_level_ranges = {}  # 属性名: 階層の最大値
-        for col in self.hierarchy_df["column"].unique():
-            filtered_hierarchy = self.hierarchy_df[self.hierarchy_df["column"] == col]
-            max_level = filtered_hierarchy["parent_level"].max()
-            min_level = filtered_hierarchy["parent_level"].min()
-            self.attribute_level_ranges[col] = AttributeLevelRange(min_level, max_level)
-
-    # def _dict2tuple(self, d: dict) -> tuple:
-    #     '''
-    #     d: {idx: index, dim1: level1, dim2: level2, ...}
-    #     -> ()
-    #     '''
-    #     row = []
-    #     for key, value in d.items():
-    #         if key == 'idx':
-    #             continue
-    #         row.extend([key, value])
-
-    #     return tuple(row)
-
-    def _append_node(self, node: dict) -> int:
+    def __init__(self, hierarchy: pd.DataFrame) -> None:
         """
-        dict表現のノードをparseしてself.nodesに追加する
-        param:
-            node: {idx: index, dim1: level1, dim2: level2, ...}
-        return:
-            index of appended node in self.nodes
+        Q: 準識別子のリスト
         """
-        row = []
-        # idx項はスキップ: 処理的にここでのidxは意味をなさないので
-        if "idx" in node.keys():
-            node.pop("idx")
+        self.nodes: List["Node"] = []
+        self.Q: List[str] = hierarchy["column"].unique().tolist()
+        self.hierarchy: pd.DataFrame = hierarchy
+        self.attributes: int = 0
 
-        # listに変換: {dim1: level1, dim2: level2, ...} -> [dim1, level1, dim2, level2, ...]
-        for key, value in node.items():
-            row.extend([key, value])
+    def _single_attribute_initialization(self) -> None:
+        """
+        単一属性の一般化について初期化、Incognitoの初期条件
+        """
+        # 単一属性について一般化変換を構築
+        for q in self.Q:
+            tmp_nodes = []
+            # 一般化の定義を取得
+            generalizations = self.hierarchy[self.hierarchy["column"] == q]
+            max_generalization_level = generalizations["parent_level"].max()
+            for generalization_level in range(max_generalization_level + 1):
+                # ノードを生成
+                node = Node([(q, generalization_level)])
+                tmp_nodes.append(node)
+            # 親子関係を構築
+            for i in range(
+                1, len(tmp_nodes)
+            ):  # rootはそこに至るノードがないのでスキップ
+                # それ以外は前のノードをfromにする
+                tmp_nodes[i].add_src_node(tmp_nodes[i - 1])
+                tmp_nodes[i - 1].add_dst_node(tmp_nodes[i])
 
-        # 追加対象のノードが既存か判断
-        query = pd.DataFrame(columns=self._node_df_cols[1:])
-        query.loc[0] = row
-        prod = pd.merge(self.nodes, query, how="inner")
-        if len(prod) == 1:
-            # すでに同じノードがあるので、そのidxを返す
-            return int(prod.iloc[0]["idx"])
-        elif len(prod) > 1:
-            # すでに重複したノードが存在しており、何かがおかしい
-            raise Exception(f"Duplicate node found in self.nodes: {prod}")
+            self.nodes.extend(tmp_nodes)
+
+    def _node_generation(self) -> None:
+        """
+        属性数+1のノードを生成する
+        """
+        # i個の属性があるとき、i-1個目までの属性とレベルが同じ かつ i個目の属性が左<右
+        active_nodes = []
+        new_nodes_tmp = []  # edgeを張る前の一時的なnode
+        for node in self.nodes:
+            if not node.deleted:
+                active_nodes.append(node)
+
+        for p, q in itertools.permutations(active_nodes, 2):
+            # 属性名でソート
+            p.generalization = sorted(p.generalization, key=lambda x: x[0])
+            q.generalization = sorted(q.generalization, key=lambda x: x[0])
+            # i-1個目までの属性とレベルが同じ かつ i個目の属性が左<右のとき，generate
+            if (p.generalization[:-1] == q.generalization[:-1]) and (
+                p.generalization[-1][0] < q.generalization[-1][0]
+            ):
+                new_generalization = set(p.generalization) | set(q.generalization)
+                append_node = Node(new_generalization)
+                append_node.add_inclement_parent([p, q])
+                new_nodes_tmp.append(append_node)
+
+        vprint(len(new_nodes_tmp), "nodes generated.")
+        self.nodes = new_nodes_tmp
+
+    def _edge_generation(self) -> None:
+        """
+        ノード間のエッジを生成する
+        """
+        for p, q in itertools.combinations(self.nodes, 2):
+            # node上で親子関係があるのは、p,qについて
+            # 1: 親1が同じで、親2同士に一般化関係がある場合
+            # 2: 親1同士に一般化関係があり、親2が同じ場合
+            # 3: 親1同士、親2同士の両方に一般化関係がある場合
+            # p -> q のエッジを生成することを考える、permutationsなので逆のパターンも知覚できる
+
+            # 親1: from_nodes[0]
+            # 親2: from_nodes[1]
+
+            # 1: 親1が同じ and 親2に一般化関係がある場合
+            cond_1 = (p.graph_gen_parents[0] == q.graph_gen_parents[0]) and (
+                (  # p -> q
+                    q.graph_gen_parents[1] in p.graph_gen_parents[1].to_nodes
+                    and p.graph_gen_parents[1] in q.graph_gen_parents[1].from_nodes
+                )
+                and (  # q -> p
+                    p.graph_gen_parents[1] in q.graph_gen_parents[1].to_nodes
+                    and q.graph_gen_parents[1] in p.graph_gen_parents[1].from_nodes
+                )
+            )
+
+            # 2: 親1にはp -> qの一般化関係がある and 親2が同じ場合
+            cond_2 = (p.graph_gen_parents[1] == q.graph_gen_parents[1]) and (
+                # p -> q
+                (
+                    q.graph_gen_parents[0] in p.graph_gen_parents[0].to_nodes
+                    and p.graph_gen_parents[0] in q.graph_gen_parents[0].from_nodes
+                )
+                # q -> p
+                and (
+                    p.graph_gen_parents[0] in q.graph_gen_parents[0].to_nodes
+                    and q.graph_gen_parents[0] in p.graph_gen_parents[0].from_nodes
+                )
+            )
+
+            # 3: 親1同士に一般化関係がある and 親2同士に一般化関係がある場合
+            cond_3 = (
+                q.graph_gen_parents[0] in p.graph_gen_parents[0].to_nodes
+                and p.graph_gen_parents[0] in q.graph_gen_parents[0].from_nodes
+            ) and (
+                q.graph_gen_parents[1] in p.graph_gen_parents[1].to_nodes
+                and p.graph_gen_parents[1] in q.graph_gen_parents[1].from_nodes
+            )
+
+            if cond_1 or cond_2 or cond_3:
+                # p -> q のエッジを追加したnodeのリストを生成
+                if p.height > q.height:
+                    # q -> p
+                    q.add_dst_node(p)
+                    p.add_src_node(q)
+                # elif p.height == q.height:
+                #     continue
+                else:
+                    # p -> q
+                    p.add_dst_node(q)
+                    q.add_src_node(p)
+
+    def graph_generation(self) -> None:
+        """
+        属性を+1したLatticeを生成する
+        """
+        vprint("node_generation: ", end="")
+        self._node_generation()
+        vprint("edge_generation")
+        self._edge_generation()
+        self.attributes += 1
+
+    def increment_attributes(self) -> None:
+        """
+        属性の数を1増やす
+        """
+        if self.attributes == 0:
+            self._single_attribute_initialization()
         else:
-            # self.nodesに追加
-            append_node_idx = len(self.nodes)
-            self.nodes.loc[append_node_idx] = [append_node_idx] + row
-            return append_node_idx
-
-    def _append_edge(self, from_idx: int, to_idx: int) -> None:
-        """
-        エッジを張る
-        param:
-            from_idx: self.nodesにおける、fromノードのindex
-            to_idx: self.nodesにおける、toノードのindex
-        """
-        # 追加対象のエッジが既存か判断
-        query = pd.DataFrame(columns=["from", "to"])
-        query.loc[0] = [from_idx, to_idx]
-        prod = pd.merge(self.edges, query, how="inner")
-
-        # すでに同じエッジがあるので、何もしない
-        if len(prod) == 1:
-            return
-        else:
-            # self.edgesに追加
-            self.edges.loc[len(self.edges)] = [from_idx, to_idx]
-
-    def construct(self) -> "Lattice":
-        """
-        latticeを構築する
-        """
-        bfs_queue = queue.Queue()
-        found_node_ids = set()
-
-        # {attribute: level}のdictを見ながらbfsする
-        root = {key: 0 for key, value in self.attribute_level_ranges.items()}
-
-        ## 初期化: 一般化レベルが最も低いnodeを追加
-        bfs_queue.put(root)
-        root_idx = self._append_node(root)
-        root["idx"] = root_idx  # 0でないとself.nodesの初期状態が空でないことになる
-        assert root_idx == 0
-        found_node_ids.add(root_idx)
-
-        # bfsでlatticeを構築
-        while not bfs_queue.empty():
-            current_node = bfs_queue.get()
-
-            # nodeの属性(key)それぞれについて、一段上の一般化階層があり得るか確認
-            for key in current_node.keys():
-                if key == "idx":
-                    continue  # idx項はスキップ
-
-                # あり得たらnodeを追加、エッジを構築
-                if current_node[key] + 1 in self.attribute_level_ranges[key]:
-                    # copyして新しいノードを作成
-                    new_node = current_node.copy()
-                    new_node[key] += 1
-
-                    # append to self.nodes and self.edges
-                    new_node["idx"] = self._append_node(new_node)
-                    self._append_edge(current_node["idx"], new_node["idx"])
-
-                    ## 既存のノードの時は、探索queueに追加しない
-                    if new_node["idx"] not in found_node_ids:
-                        bfs_queue.put(new_node)
-                        found_node_ids.add(new_node["idx"])
-        return self
-
-    def drop_node(self, id: Union[int, float]) -> None:
-        """
-        idのノードを削除する
-        """
-        # idのノードを削除
-        tar_node = self.nodes[self.nodes["idx"] == id]
-        self.dropped_nodes = pd.concat([self.dropped_nodes, tar_node])
-        self.nodes = self.nodes[self.nodes["idx"] != id]
-
-        # idのノードに関連するエッジを削除
-        self.dropped_edges = pd.concat(
-            [
-                self.dropped_edges,
-                self.edges[(self.edges["from"] == id) | (self.edges["to"] == id)],
-            ]
-        )
-        self.edges = self.edges[(self.edges["from"] != id) & (self.edges["to"] != id)]
-
-    def reconstruct(self, ref_lattice: "Lattice") -> None:
-        """
-        ref_latticeを参照して、latticeを再構築する
-        self.nodesから、ref_lattice.drop_nodesの条件を含むノードを削除し、エッジを再構築
-        """
-        # self.nodesのうち、ref_lattice.dropped_nodesに含まれる条件を満たす（削除されるべき）ノードを抽出
-        dropping_nodes = pd.merge(
-            self.nodes,
-            ref_lattice.dropped_nodes,
-            how="inner",
-            on=ref_lattice.dropped_nodes.columns.tolist()[1:],  # idxを除く
-        )
-
-        for id in dropping_nodes["idx_x"]:
-            # ノードを削除
-            self.drop_node(id)
-
-    def merge_with(self, other: "Lattice") -> "Lattice":
-        """
-        引数に取ったLatticeとselfをマージする
-        nodesの直積をとり、エッジを再構築
-        新しいLatticeインスタンスを返す
-        param other: マージ対象のLattice
-        return: 新しいLatticeインスタンス
-        """
-        new_lattice = Lattice(pd.concat([self.hierarchy_df, other.hierarchy_df], ignore_index=True))
-        
-        # ノードの直積をとる
-        self_nodes = self.nodes.drop(columns=["idx"])  # idxは除外
-        other_nodes = other.nodes.drop(columns=["idx"])  # idxは除外
-        new_nodes = pd.merge(self_nodes, other_nodes, how="cross")
-
-        node_df_cols = []
-        for i in range(len(new_nodes.columns) // 2):
-            node_df_cols.append(f"dim{i + 1}")
-            node_df_cols.append(f"level{i + 1}")
-
-        new_nodes.columns = node_df_cols
-        # idx列を追加
-        new_nodes["idx"] = range(len(new_nodes))
-
-        new_lattice.nodes = new_nodes
-
-
-        # 各ノードペアについて、エッジを再構築
-        for node1, node2 in itertools.combinations(new_nodes.index, 2):
-            
-            continue
-        print(f"node1: {new_nodes.loc[node1]}, node2: {new_nodes.loc[node2]}")
-
-    def __str__(self) -> str:
-        """
-        Latticeの文字列表現
-        """
-        return (
-            f"\nLattice object at {hex(id(self))}\nnodes:\n{self.nodes},\nedges:\n{self.edges}\n"
-            ""
-        )
+            self.graph_generation()
+        self.attributes += 1

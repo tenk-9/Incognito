@@ -16,6 +16,7 @@ hierarchy_filepaths = {
     "workclass": ".data/.hierarchy/adult_hierarchy_workclass.csv",
 }
 
+
 def set_verbose(verbose: bool) -> None:
     """
     Set the global verbose flag for logging.
@@ -23,12 +24,14 @@ def set_verbose(verbose: bool) -> None:
     global VERBOSE
     VERBOSE = verbose
 
+
 def vprint(*args, **kwargs) -> None:
     """
     Print messages only if verbose mode is enabled.
     """
     if VERBOSE:
         print(*args, **kwargs)
+
 
 def fetch_dataset(dataset_name: str = "adult") -> pd.DataFrame:
     """
@@ -170,11 +173,11 @@ def read_hierarchy_official_csv(file_path: str, col_name: str) -> pd.DataFrame:
             append_df["child_level"] = child_col
             append_df["parent_level"] = parent_col
             hierarchy_df = pd.concat([hierarchy_df, append_df], ignore_index=True)
-   
+
     # csvとdatatable上のcol名が違うものは置換する
-    if col_name == 'salary-class':
-        col_name = 'income'
-        
+    if col_name == "salary-class":
+        col_name = "income"
+
     hierarchy_df["column"] = col_name
     return hierarchy_df
 
@@ -201,3 +204,16 @@ def read_hierarchies_by_col_names(col_names: list[str]) -> pd.DataFrame:
         else:
             raise ValueError(f"Unknown column name: {col_name}")
     return pd.concat(hierarchies, ignore_index=True)
+
+
+def dropna(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Drop rows with NaN values.
+    param df: Input DataFrame
+    return: DataFrame with rows containing NaN in specified columns dropped
+    """
+    _df = df.copy()
+    _df = _df.replace("?", pd.NA)  # '?'をNaNに置換
+    _df = _df.dropna(axis=0, how="any")
+
+    return _df

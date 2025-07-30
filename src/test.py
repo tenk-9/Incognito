@@ -2,7 +2,7 @@ from ucimlrepo import fetch_ucirepo
 import pandas as pd
 import utils, df_operations
 from lattice import Lattice
-from incognito import Incognito, Incognito_
+from incognito import Incognito
 # fetch dataset
 adult = utils.fetch_dataset()
 
