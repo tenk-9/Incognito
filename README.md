@@ -63,7 +63,7 @@
         options:
         -h, --help            show this help message and exit
         --dataset DATASET     Dataset to use (default: 'adult'). Currently only 'adult' is supported.
-        --k K                 k-anonymity parameter (default: 20)
+        --k K                 k-anonymity parameter (default: 10)
         --q_cols Q_COLS [Q_COLS ...]
                                 List of quasi-identifier columns to generalize (e.g., 'workclass', 'education'). For use of unofficial hierarchy, put _ at the end of the column name (e.g., 'workclass_').
         --verbose             Enable verbose output
