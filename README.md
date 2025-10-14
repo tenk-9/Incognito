@@ -1,5 +1,12 @@
 # Incognito - Python Implementation
 
+k-匿名化アルゴリズム Incognito のPython実装です。
+
+## 概要
+Incognitoは、データセットのk匿名性を担保する一般化変換を高速に探索するアルゴリズムです。準識別子の少ない組み合わせから順に検証を行い、k匿名性を満たし得ないパターンを枝刈りすることで探索空間を絞り込み、高速な探索を行います。k-匿名性を満たすすべての一般化変換が得られるため、アプリケーションの目的に合わせて最適な変換を柔軟に選択できます。
+
+### 参考文献
+> [LeFevre, K., *et al.*, "Incognito: efficient full-domain K-anonymity." *In Proc. ACM SIGMOD*, 49–60, 2005.](https://dl.acm.org/doi/10.1145/1066157.1066164)
 
 ## セットアップ
 
