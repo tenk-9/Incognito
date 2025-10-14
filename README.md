@@ -1,81 +1,103 @@
-# 環境構築
-## ディレクトリ構造の確認・データの準備
-ディレクトリ構成は次のようです：
+# Incognito - Python Implementation
+
+
+## セットアップ
+
+### 1. Python環境の構築
+
+#### uvを使う場合（推奨）
+```bash
+# uvのインストール（https://docs.astral.sh/uv/getting-started/installation/）
+$ uv sync
+```
+
+#### condaを使う場合
+```bash
+# condaのインストール（https://docs.conda.io/projects/conda/en/latest/user-guide/install/）
+$ conda env create -f conda_env.yaml
+```
+
+### 2. プログラムの実行
+
+#### 基本的な使い方
+```bash
+$ uv run python main.py --k 10 --q_cols sex workclass marital-status
+```
+
+#### 実行結果
+実行すると、`((準識別子名, 変換レベル), ...)`をkey、対応する一般化変換済みのDataFrameをvalueとするdictが返されます。
+
+#### コマンドラインオプション
+```
+usage: main.py [-h] [--dataset DATASET] [--k K] [--q_cols Q_COLS [Q_COLS ...]] [--verbose] [--dropna]
+
+options:
+  -h, --help            ヘルプを表示
+  --dataset DATASET     使用するデータセット（デフォルト: 'adult'、現在は'adult'のみ対応）
+  --k K                 k-匿名性のパラメータ（デフォルト: 10）
+  --q_cols Q_COLS [Q_COLS ...]
+                        一般化する準識別子のリスト（例: 'workclass', 'education'）
+                        独自の一般化階層を使う場合は末尾に _ を付ける（例: 'workclass_'）
+  --verbose             詳細な出力を有効化
+  --dropna              NaNを含むレコードを削除
+```
+
+## データと一般化階層について
+
+### ディレクトリ構造
 ```
 .
-├── .data
-│   ├── .hierarchy
-│   │   ├── adult_hierarchy_age.csv
-│   │   ├── ...
-│   │   └── adult_hierarchy_workclass.csv
-│   ├── sex.txt
-│   └── workClass.txt
-├── .gitignore
-├── .python-version
-├── README.md
+├── .data/
+│   ├── .hierarchy/          # 標準の一般化階層定義
+│   │   ├── adult_hierarchy_age.csv
+│   │   └── adult_hierarchy_workclass.csv
+│   ├── sex.txt              # 独自の一般化階層定義
+│   └── workClass.txt
 ├── main.py
 ├── pyproject.toml
-├── src
-│   ├── .data -> ../.data/
-│   ├── __init__.py
-│   ├── df_operations.py
-│   ├── incognito.py
-│   ├── lattice.py
-│   ├── node.py
-│   ├── test.py
-│   └── utils.py
-└── uv.lock
+└── src/
+    ├── incognito.py
+    └── ...
 ```
-- `.data/`: 独自の一般化階層定義を置いてください。タブの深さで階層を表現するようにしてください。
-  ```
-        Work
-            Working
-                Individual
-                    Private
-                    ...
-            Not_working
-                Unemployed
-                    Without-pay
-                    ...
-                outlier
-                    ?
-  ```
-- `.data/.hierarchy/`: 一般化階層の定義を置いてください。各属性値について、`;`区切りで左から右へ一般化した値を列挙してください。
-  ```
-    Private;Non-Government;*
-    Self-emp-not-inc;Non-Government;*
-    ...
-  ```
-## python環境の構築
-1. パッケージ管理ツールをインストール
-   - pythonのパッケージ管理には`uv`を使います
-   - https://docs.astral.sh/uv/getting-started/installation/#__tabbed_1_1 からインストールしてください　
-2. python環境を構築
-   - 環境を構築します: `uv syc`
-# プログラムの実行
-1. `uv run python main.py`でプログラムが実行されます。
-   - コマンドライン引数でいくつかのオプションが指定できます:
-        ```
-        usage: main.py [-h] [--dataset DATASET] [--k K] [--q_cols Q_COLS [Q_COLS ...]] [--verbose] [--dropna]
 
-        Run Incognito with specified parameters.
+### 一般化階層の定義形式
 
-        options:
-        -h, --help            show this help message and exit
-        --dataset DATASET     Dataset to use (default: 'adult'). Currently only 'adult' is supported.
-        --k K                 k-anonymity parameter (default: 10)
-        --q_cols Q_COLS [Q_COLS ...]
-                                List of quasi-identifier columns to generalize (e.g., 'workclass', 'education'). For use of unofficial hierarchy, put _ at the end of the column name (e.g., 'workclass_').
-        --verbose             Enable verbose output
-        --dropna              Drops records which includes NaN.
-        ```
-    - 例）準識別子: `sex, workclass, marital-status`、`k=10`の場合は、以下のコマンドで実行できます。
-        ```
-        uv run python main.py --k 10 --q_cols sex workclass marital-status
-        ```
-    - `.data/`直下に配置した独自の一般化階層の定義を指定するときは、`--q_cols`で指定する識別子の後ろに`_`をつけてください。
-      - 現在は`workclass`と`sex`のみ独自の一般化階層が利用可能です。
-      - 新規で独自の一般化階層を定義する場合は、以下のとおりにしてください。
-        1. `.data/`にファイルを配置する
-        2. `src/utils.py`の`hierarchy_filepaths`に、`columnName_: "./data/fileName"` の形で記述してください
-2. `((準識別子名, 変換レベル), ...)`をkey、対応する一般化変換済みのdataframeをvalueとするdictが返されます。
+#### 標準形式（`.data/.hierarchy/`内）
+セミコロン区切りで、左から右へ一般化の段階を定義します。
+```
+Private;Non-Government;*
+Self-emp-not-inc;Non-Government;*
+...
+```
+
+#### 独自形式（`.data/`直下）
+タブのインデントで階層構造を表現します。
+```
+Work
+    Working
+        Individual
+            Private
+            ...
+    Not_working
+        Unemployed
+            Without-pay
+            ...
+        outlier
+            ?
+```
+
+### 独自の一般化階層を使う場合
+
+**利用方法：**
+```bash
+# 準識別子名の末尾に _ を付けて指定
+$ uv run python main.py --k 10 --q_cols sex_ workclass_
+```
+- 現在利用可能: `workclass_`, `sex_`
+
+**新しい独自階層を追加する場合：**
+1. `.data/`ディレクトリにファイルを配置
+2. `src/utils.py`の`hierarchy_filepaths`に以下の形式で追加
+   ```python
+   columnName_: "./data/fileName"
+   ```
