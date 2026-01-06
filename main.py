@@ -30,7 +30,7 @@ parser.add_argument(
         # "age",
         "native-country",
     ],
-    help="List of quasi-identifier columns to generalize (e.g., 'workclass', 'education'). For use of unofficial hierarchy, put _ at the end of the column name (e.g., 'workclass_').",
+    help="List of quasi-identifier columns to generalize (e.g., 'workclass', 'education').",
 )
 parser.add_argument(
     "--verbose",
