@@ -10,7 +10,30 @@ Incognitoは、データセットのk匿名性を担保する一般化変換を�
 
 ## セットアップ
 
-### 1. Python環境の構築
+### 1. データセットの配置
+
+プロジェクトルートに `Data/` ディレクトリを作成し、データセットと階層定義ファイルを配置します：
+
+```bash
+Data/
+├── adult/
+│   ├── adult.csv              # データセット
+│   └── hierarchies/           # 階層定義ファイル
+│       ├── age.csv
+│       ├── education.csv
+│       ├── marital-status.csv
+│       ├── native-country.csv
+│       ├── occupation.csv
+│       ├── race.csv
+│       ├── salary-class.csv
+│       ├── sex.csv
+│       └── workclass.csv
+├── atus/
+├── cup/
+└── ...
+```
+
+### 2. Python環境の構築
 
 #### uvを使う場合（推奨）
 ```bash
@@ -24,7 +47,7 @@ $ uv sync
 $ conda env create -f conda_env.yaml
 ```
 
-### 2. プログラムの実行
+### 3. プログラムの実行
 
 #### 基本的な使い方
 ```bash
@@ -36,75 +59,62 @@ $ uv run python main.py --k 10 --q_cols sex workclass marital-status
 
 #### コマンドラインオプション
 ```
-usage: main.py [-h] [--dataset DATASET] [--k K] [--q_cols Q_COLS [Q_COLS ...]] [--verbose] [--dropna]
+usage: main.py [-h] [--dataset DATASET] [--k K] [--q_cols Q_COLS [Q_COLS ...]] [--verbose] [--dropna] [--output OUTPUT]
 
 options:
   -h, --help            ヘルプを表示
-  --dataset DATASET     使用するデータセット（デフォルト: 'adult'、現在は'adult'のみ対応）
+  --dataset DATASET     使用するデータセット（デフォルト: 'adult'）
   --k K                 k-匿名性のパラメータ（デフォルト: 10）
   --q_cols Q_COLS [Q_COLS ...]
                         一般化する準識別子のリスト（例: 'workclass', 'education'）
-                        独自の一般化階層を使う場合は末尾に _ を付ける（例: 'workclass_'）
   --verbose             詳細な出力を有効化
   --dropna              NaNを含むレコードを削除
+  --output OUTPUT       結果の出力ディレクトリ（未指定の場合は自動生成）
 ```
 
-## データと一般化階層について
+### プログラムからの利用
 
-### ディレクトリ構造
-```
-.
-├── .data/
-│   ├── .hierarchy/          # 標準の一般化階層定義
-│   │   ├── adult_hierarchy_age.csv
-│   │   └── adult_hierarchy_workclass.csv
-│   ├── sex.txt              # 独自の一般化階層定義
-│   └── workClass.txt
-├── main.py
-├── pyproject.toml
-└── src/
-    ├── incognito.py
-    └── ...
-```
+```python
+from src import Incognito, utils
 
-### 一般化階層の定義形式
+# データセット読み込み
+dataset = utils.read_dataset("adult")
+dataset = utils.dropna(dataset)  # 欠損値削除（オプション）
 
-#### 標準形式（`.data/.hierarchy/`内）
-セミコロン区切りで、左から右へ一般化の段階を定義します。
-```
-Private;Non-Government;*
-Self-emp-not-inc;Non-Government;*
-...
+# 階層定義読み込み
+q_cols = ["sex", "workclass", "marital-status"]
+hierarchies_dir = "Data/adult/hierarchies"
+hierarchy = utils.read_hierarchies_by_col_names(q_cols, hierarchies_dir)
+hierarchy = hierarchy[hierarchy["child_level"] == 0]
+
+# Incognitoアルゴリズム実行
+incognito = Incognito(dataset, hierarchy, k=10)
+incognito.run()
+
+# 結果取得・表示
+incognito.print_result()
+
+# 結果保存
+incognito.save_result("result/my_experiment")
 ```
 
-#### 独自形式（`.data/`直下）
-タブのインデントで階層構造を表現します。
+## Result
+
+実行結果は指定したディレクトリ（または自動生成されたディレクトリ）に保存されます：
+
 ```
-Work
-    Working
-        Individual
-            Private
-            ...
-    Not_working
-        Unemployed
-            Without-pay
-            ...
-        outlier
-            ?
+result/adult_sex_workclass_k10_20260106_154731/
+├── generalizations/
+│   ├── sex0_workclass2.csv
+│   ├── sex1_workclass0.csv
+│   ├── sex1_workclass1.csv
+│   └── sex1_workclass2.csv
+└── metadata.json
 ```
 
-### 独自の一般化階層を使う場合
+### generalizations/
 
-**利用方法：**
-```bash
-# 準識別子名の末尾に _ を付けて指定
-$ uv run python main.py --k 10 --q_cols sex_ workclass_
-```
-- 現在利用可能: `workclass_`, `sex_`
+Incognitoの結果（k-匿名性を満たす一般化）を適用したデータセット。ファイル名から各属性の一般化レベルが分かります：
 
-**新しい独自階層を追加する場合：**
-1. `.data/`ディレクトリにファイルを配置
-2. `src/utils.py`の`hierarchy_filepaths`に以下の形式で追加
-   ```python
-   columnName_: "./data/fileName"
-   ```
+- `sex0_workclass2.csv`: sexレベル0、workclassレベル2で一般化
+- `sex1_workclass0.csv`: sexレベル1、workclassレベル0で一般化
