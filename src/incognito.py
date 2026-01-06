@@ -1,6 +1,7 @@
 from typing import List
 import pandas as pd
 import queue
+import time
 
 from . import df_operations
 from .lattice import Lattice
@@ -14,12 +15,15 @@ class Incognito:
         self.hierarchy: pd.DataFrame = hierarchy  # 一般化階層の定義df
         self.k: int = k  # k-匿名性のk値
         self.lattice: Lattice  # 構築済みのLattice
+        self.execution_time: float = None  # 実行時間
 
     def run(self) -> List[List[tuple]]:
         """
         Incognitoの実行
         return: 一般化されたDataFrame
         """
+        start_time = time.perf_counter()
+
         self.lattice = Lattice(self.hierarchy)
         # self.lattice.increment_attributes()  # initialization of the lattice
         priority_queue = queue.PriorityQueue()
@@ -93,6 +97,9 @@ class Incognito:
             for node in self.lattice.nodes
             if not node.deleted
         ]
+
+        self.execution_time = time.perf_counter() - start_time
+
         return result_generalizations
 
     def get_result(self) -> dict:
