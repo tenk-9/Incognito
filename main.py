@@ -52,10 +52,10 @@ parser.add_argument(
 args = parser.parse_args()
 utils.set_verbose(args.verbose)
 
-# fetch dataset
-vprint("Fetching dataset:", args.dataset)
-dataset = utils.fetch_dataset(args.dataset)
-vprint(f"Dataset fetched: {dataset.shape[0]} records.")
+# read dataset
+vprint("Reading dataset:", args.dataset)
+dataset = utils.read_dataset(args.dataset)
+vprint(f"Dataset loaded: {dataset.shape[0]} records.")
 
 # limit dataset size if specified
 if args.size_limit is not None:

@@ -1,7 +1,7 @@
 .private
 .data
+Data
+result/
 __pycache__
 .vscode
 .src/test.py
-
-!src/.data
