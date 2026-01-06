@@ -48,6 +48,12 @@ parser.add_argument(
     default=None,
     help="FOR DEBUG: Limit the size of the dataset to this number of records. If None, all records are used.",
 )
+parser.add_argument(
+    "--output",
+    type=str,
+    default=None,
+    help="Output directory for results. If not specified, auto-generates from dataset, quasi-identifiers, k, and timestamp.",
+)
 
 args = parser.parse_args()
 utils.set_verbose(args.verbose)
@@ -83,6 +89,14 @@ incognito.print_result()
 if utils.VERBOSE:
     incognito.verify_result()
 
-# result here
-result = incognito.get_result()
-vprint(result)
+# 出力ディレクトリの生成
+if args.output:
+    output_dir = args.output
+else:
+    from datetime import datetime
+    q_cols_str = "_".join(args.q_cols)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_dir = f"result/{args.dataset}_{q_cols_str}_k{args.k}_{timestamp}"
+
+# 結果保存
+incognito.save_result(output_dir)

@@ -201,3 +201,75 @@ class Incognito:
 
         print(f"All {len(result)} nodes satisfies k-anonymity (k={self.k}).")
         return True
+
+    def save_result(self, output_dir: str) -> None:
+        """
+        Incognito実行結果を保存
+
+        出力構造:
+        output_dir/
+        ├── generalizations/
+        │   ├── sex0_workclass2.csv
+        │   ├── sex1_workclass0.csv
+        │   └── ...
+        └── metadata.json
+        """
+        from pathlib import Path
+        from datetime import datetime
+        import json
+
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+
+        # generalizations ディレクトリを作成
+        gen_dir = output_path / "generalizations"
+        gen_dir.mkdir(exist_ok=True)
+
+        result = self.get_result()
+
+        if not result:
+            print("Warning: No valid generalizations found. Saving metadata only.")
+            valid_generalizations = []
+            generalizations_metadata = []
+        else:
+            valid_generalizations = list(result.keys())
+            generalizations_metadata = []
+
+            # 各一般化を保存
+            for gen_tuple in valid_generalizations:
+                # ファイル名生成: sex0_workclass2.csv のような形式
+                filename_parts = [f"{col}{level}" for col, level in sorted(gen_tuple, key=lambda x: x[0])]
+                filename = "_".join(filename_parts) + ".csv"
+                csv_path = gen_dir / filename
+
+                # データ保存
+                gen_df = result[gen_tuple]
+                gen_df.to_csv(csv_path, index=False)
+
+                # メタデータに記録
+                height = sum(level for _, level in gen_tuple)
+                generalizations_metadata.append({
+                    "filename": filename,
+                    "generalization": dict(gen_tuple),
+                    "height": height
+                })
+
+            print(f"{len(valid_generalizations)} generalizations saved to {gen_dir}")
+
+        # メタデータ作成
+        metadata = {
+            "algorithm": "Incognito",
+            "k": self.k,
+            "quasi_identifiers": self.Q,
+            "num_valid_generalizations": len(valid_generalizations),
+            "generalizations": sorted(generalizations_metadata, key=lambda x: x["height"]),
+            "execution_time": self.execution_time,
+            "num_records": len(self.T),
+            "timestamp": datetime.now().isoformat()
+        }
+
+        metadata_path = output_path / "metadata.json"
+        with open(metadata_path, "w", encoding="utf-8") as f:
+            json.dump(metadata, f, indent=2, ensure_ascii=False)
+        print(f"Metadata saved to: {metadata_path}")
+        print(f"\nAll results saved to: {output_path.absolute()}")
