@@ -70,7 +70,8 @@ if args.dropna:
 
 # read hierarchies definition
 vprint(f"Reading generalization hierarchies for {args.q_cols}...")
-hierarchy = utils.read_hierarchies_by_col_names(args.q_cols)
+hierarchies_dir = f"Data/{args.dataset}/hierarchies"
+hierarchy = utils.read_hierarchies_by_col_names(args.q_cols, hierarchies_dir)
 # filter hierarchy
 hierarchy = hierarchy[(hierarchy["child_level"] == 0)]
 

@@ -169,27 +169,24 @@ def read_hierarchy_official_csv(file_path: str, col_name: str) -> pd.DataFrame:
     return hierarchy_df
 
 
-def read_hierarchies_by_col_names(col_names: list[str]) -> pd.DataFrame:
+def read_hierarchies_by_col_names(col_names: list[str], hierarchies_dir: str) -> pd.DataFrame:
     """
-    read hierarchies from files by column names
+    CSV階層ファイルから階層定義を読み込む
+
     param col_names: list of column names to read hierarchies
+    param hierarchies_dir: directory containing hierarchy CSV files
     return: concatenated hierarchy df
     """
+    if not os.path.exists(hierarchies_dir):
+        raise ValueError(f"Hierarchies directory: {hierarchies_dir} does not exist.")
+
     hierarchies = []
     for col_name in col_names:
-        if col_name in hierarchy_filepaths:
-            if col_name.endswith("_"):
-                # unofficialな階層定義ファイルの場合
-                hierarchies.append(
-                    read_hierarchy(hierarchy_filepaths[col_name], col_name[:-1])
-                )
-            else:
-                # officialな階層定義ファイルの場合
-                hierarchies.append(
-                    read_hierarchy_official_csv(hierarchy_filepaths[col_name], col_name)
-                )
-        else:
-            raise ValueError(f"Unknown column name: {col_name}")
+        hierarchy_path = os.path.join(hierarchies_dir, f"{col_name}.csv")
+        if not os.path.exists(hierarchy_path):
+            raise ValueError(f"Hierarchy file not found: {hierarchy_path}")
+        hierarchies.append(read_hierarchy_official_csv(hierarchy_path, col_name))
+
     return pd.concat(hierarchies, ignore_index=True)
 
 
