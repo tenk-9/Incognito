@@ -1,20 +1,7 @@
-from ucimlrepo import fetch_ucirepo
 import pandas as pd
 import os
 
-hierarchy_filepaths = {
-    "workclass_": ".data/workClass.txt",
-    "sex_": ".data/sex.txt",
-    "age": ".data/.hierarchy/adult_hierarchy_age.csv",
-    "education": ".data/.hierarchy/adult_hierarchy_education.csv",
-    "marital-status": ".data/.hierarchy/adult_hierarchy_marital-status.csv",
-    "native-country": ".data/.hierarchy/adult_hierarchy_native-country.csv",
-    "occupation": ".data/.hierarchy/adult_hierarchy_occupation.csv",
-    "race": ".data/.hierarchy/adult_hierarchy_race.csv",
-    "salary-class": ".data/.hierarchy/adult_hierarchy_salary-class.csv",
-    "sex": ".data/.hierarchy/adult_hierarchy_sex.csv",
-    "workclass": ".data/.hierarchy/adult_hierarchy_workclass.csv",
-}
+VERBOSE = False
 
 
 def set_verbose(verbose: bool) -> None:
@@ -33,33 +20,33 @@ def vprint(*args, **kwargs) -> None:
         print(*args, **kwargs)
 
 
-def fetch_dataset(dataset_name: str = "adult") -> pd.DataFrame:
+def read_dataset(dataset_name: str) -> pd.DataFrame:
     """
-    fetch adult dataset from UCI Machine Learning Repository (https://archive.ics.uci.edu/dataset/2/adult)
-    RETURN: adult dataset as a pandas dataframe
+    データセットを Data ディレクトリから読み込む
+    Dataset directory structure:
+    ./Data/
+        {dataset_name}/
+            {dataset_name}.csv
+            hierarchies/
+                {column}.csv
+                ...
+
+    param: dataset_name: データセット名
+    return: pd.DataFrame: 読み込んだデータセット
     """
-    if dataset_name not in [
-        "adult",
-    ]:
+    if dataset_name not in ["adult", "atus", "cup", "fars", "ihis", "ACS13_ma"]:
         raise ValueError(f"Unknown dataset name: {dataset_name}")
 
-    # Fetch dataset
-    if os.path.exists(f".data/{dataset_name}.csv"):
-        data = pd.read_csv(f".data/{dataset_name}.csv", index_col=0)
+    # Determine separator (ACS13_ma uses comma, others use semicolon)
+    separator = "," if dataset_name == "ACS13_ma" else ";"
+
+    dataset_path = f"Data/{dataset_name}/{dataset_name}.csv"
+    if os.path.exists(dataset_path):
+        data = pd.read_csv(dataset_path, sep=separator)
     else:
-        adult = fetch_ucirepo(id=2)
-        data = adult.data.original
-        data.columns = adult.data.headers
-        data.to_csv(f".data/{dataset_name}.csv")
+        raise ValueError(f"Dataset file ({dataset_path}) does not exist.")
+
     return data
-
-
-def fetch_dataset_csv() -> None:
-    """
-    save adult dataset as a csv file
-    """
-    adult = fetch_dataset()
-    adult.to_csv("adult.csv")
 
 
 def read_hierarchy(file_path: str, col_name: str) -> pd.DataFrame:
