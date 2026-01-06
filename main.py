@@ -30,7 +30,7 @@ parser.add_argument(
         # "age",
         "native-country",
     ],
-    help="List of quasi-identifier columns to generalize (e.g., 'workclass', 'education'). For use of unofficial hierarchy, put _ at the end of the column name (e.g., 'workclass_').",
+    help="List of quasi-identifier columns to generalize (e.g., 'workclass', 'education').",
 )
 parser.add_argument(
     "--verbose",
@@ -48,14 +48,20 @@ parser.add_argument(
     default=None,
     help="FOR DEBUG: Limit the size of the dataset to this number of records. If None, all records are used.",
 )
+parser.add_argument(
+    "--output",
+    type=str,
+    default=None,
+    help="Output directory for results. If not specified, auto-generates from dataset, quasi-identifiers, k, and timestamp.",
+)
 
 args = parser.parse_args()
 utils.set_verbose(args.verbose)
 
-# fetch dataset
-vprint("Fetching dataset:", args.dataset)
-dataset = utils.fetch_dataset(args.dataset)
-vprint(f"Dataset fetched: {dataset.shape[0]} records.")
+# read dataset
+vprint("Reading dataset:", args.dataset)
+dataset = utils.read_dataset(args.dataset)
+vprint(f"Dataset loaded: {dataset.shape[0]} records.")
 
 # limit dataset size if specified
 if args.size_limit is not None:
@@ -70,7 +76,8 @@ if args.dropna:
 
 # read hierarchies definition
 vprint(f"Reading generalization hierarchies for {args.q_cols}...")
-hierarchy = utils.read_hierarchies_by_col_names(args.q_cols)
+hierarchies_dir = f"Data/{args.dataset}/hierarchies"
+hierarchy = utils.read_hierarchies_by_col_names(args.q_cols, hierarchies_dir)
 # filter hierarchy
 hierarchy = hierarchy[(hierarchy["child_level"] == 0)]
 
@@ -82,6 +89,14 @@ incognito.print_result()
 if utils.VERBOSE:
     incognito.verify_result()
 
-# result here
-result = incognito.get_result()
-vprint(result)
+# 出力ディレクトリの生成
+if args.output:
+    output_dir = args.output
+else:
+    from datetime import datetime
+    q_cols_str = "_".join(args.q_cols)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_dir = f"result/{args.dataset}_{q_cols_str}_k{args.k}_{timestamp}"
+
+# 結果保存
+incognito.save_result(output_dir)

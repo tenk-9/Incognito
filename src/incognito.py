@@ -1,6 +1,7 @@
 from typing import List
 import pandas as pd
 import queue
+import time
 
 from . import df_operations
 from .lattice import Lattice
@@ -14,12 +15,15 @@ class Incognito:
         self.hierarchy: pd.DataFrame = hierarchy  # 一般化階層の定義df
         self.k: int = k  # k-匿名性のk値
         self.lattice: Lattice  # 構築済みのLattice
+        self.execution_time: float = None  # 実行時間
 
     def run(self) -> List[List[tuple]]:
         """
         Incognitoの実行
         return: 一般化されたDataFrame
         """
+        start_time = time.perf_counter()
+
         self.lattice = Lattice(self.hierarchy)
         # self.lattice.increment_attributes()  # initialization of the lattice
         priority_queue = queue.PriorityQueue()
@@ -93,6 +97,9 @@ class Incognito:
             for node in self.lattice.nodes
             if not node.deleted
         ]
+
+        self.execution_time = time.perf_counter() - start_time
+
         return result_generalizations
 
     def get_result(self) -> dict:
@@ -194,3 +201,75 @@ class Incognito:
 
         print(f"All {len(result)} nodes satisfies k-anonymity (k={self.k}).")
         return True
+
+    def save_result(self, output_dir: str) -> None:
+        """
+        Incognito実行結果を保存
+
+        出力構造:
+        output_dir/
+        ├── generalizations/
+        │   ├── sex0_workclass2.csv
+        │   ├── sex1_workclass0.csv
+        │   └── ...
+        └── metadata.json
+        """
+        from pathlib import Path
+        from datetime import datetime
+        import json
+
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+
+        # generalizations ディレクトリを作成
+        gen_dir = output_path / "generalizations"
+        gen_dir.mkdir(exist_ok=True)
+
+        result = self.get_result()
+
+        if not result:
+            print("Warning: No valid generalizations found. Saving metadata only.")
+            valid_generalizations = []
+            generalizations_metadata = []
+        else:
+            valid_generalizations = list(result.keys())
+            generalizations_metadata = []
+
+            # 各一般化を保存
+            for gen_tuple in valid_generalizations:
+                # ファイル名生成: sex0_workclass2.csv のような形式
+                filename_parts = [f"{col}{level}" for col, level in sorted(gen_tuple, key=lambda x: x[0])]
+                filename = "_".join(filename_parts) + ".csv"
+                csv_path = gen_dir / filename
+
+                # データ保存
+                gen_df = result[gen_tuple]
+                gen_df.to_csv(csv_path, index=False)
+
+                # メタデータに記録
+                height = sum(level for _, level in gen_tuple)
+                generalizations_metadata.append({
+                    "filename": filename,
+                    "generalization": dict(gen_tuple),
+                    "height": height
+                })
+
+            print(f"{len(valid_generalizations)} generalizations saved to {gen_dir}")
+
+        # メタデータ作成
+        metadata = {
+            "algorithm": "Incognito",
+            "k": self.k,
+            "quasi_identifiers": self.Q,
+            "num_valid_generalizations": len(valid_generalizations),
+            "generalizations": sorted(generalizations_metadata, key=lambda x: x["height"]),
+            "execution_time": self.execution_time,
+            "num_records": len(self.T),
+            "timestamp": datetime.now().isoformat()
+        }
+
+        metadata_path = output_path / "metadata.json"
+        with open(metadata_path, "w", encoding="utf-8") as f:
+            json.dump(metadata, f, indent=2, ensure_ascii=False)
+        print(f"Metadata saved to: {metadata_path}")
+        print(f"\nAll results saved to: {output_path.absolute()}")
